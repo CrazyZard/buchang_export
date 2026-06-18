@@ -1,0 +1,49 @@
+---
+description: 巴拉（balabala）洗唛模板维护规范
+globs: src/templates/index.ts,src/utils/labelDefaults.ts,src/components/WashLabelSections.tsx,src/App.css
+alwaysApply: false
+---
+
+# 巴拉模板 balabala
+
+## 标识
+
+- `TemplateId`: `balabala`
+- CSS 前缀: `.wash-label--balabala`
+- 默认数据: `createBalabalaLabelData()`
+- 成分部位: `compositionParts: ['fabric', 'ribbing', 'lining', 'filling']`
+- 面料、罗纹、里料、填充物默认可选不填，无数据时预览与编辑区均隐藏，可通过「+ 添加面料/罗纹/…」补充
+
+## 规格
+
+- **25×54mm**；顶缝 **8mm**；显示 Logo
+- 字典: `balabala.xlsx`
+- 中文：显示「成分」标题；面料/罗纹分行缩进；成分与洗涤说明之间空一行
+- 洗护图标 5 个：手洗、不可漂白、平摊晾干、不可熨烫 + 自动「不可干洗」
+- **翻译阿语成分块：上下各一条黑色实线**（`arabicBlockBorder: 'solid'`）
+- 翻译成分 `translatedCompositionLayout: 'auto'`：成分条数少时每材质换行；条数多时同部位拼接一行；拼接超过 `translatedCompositionLineChars`（默认 24）时在材质单元之间换行并与首行对齐（配合 `AutoFitLabel` 缩字适配 54mm 高度）
+- 款号/工厂代码：中文与翻译区均为常规字重（不加粗）
+
+## 默认样稿
+
+- 面料/罗纹/里料/填充物：默认空
+- 款号 `202426103123` / 工厂代码 `1227`
+
+## 修改时勿动
+
+- 本规范**仅适用于 `balabala` 模板**；迷你巴拉、bala-prem、羽绒等保持各自规则
+- `careLayout: 'mini-centered'`、`arabicBlockBorder: 'none'` 属于迷你巴拉
+- 羽绒模板 `compositionMode: 'down-jacket'` 与充绒量表格
+
+## 样式示例
+
+```css
+.wash-label--balabala.wash-label--source,
+.wash-label--balabala.wash-label--translated {
+  min-height: 54mm;
+}
+
+.wash-label--translated .lang-block--arabic-bordered {
+  /* 阿语上下黑线，勿删 */
+}
+```

@@ -1,0 +1,27 @@
+---
+description: 迷你巴拉洗唛模板维护规范
+globs: src/templates/index.ts,src/utils/labelDefaults.ts,src/utils/miniBalabalaLayout.ts,src/components/WashLabelSections.tsx,src/App.css
+alwaysApply: false
+---
+
+# 迷你巴拉模板 mini-balabala
+
+## 标识
+
+- `TemplateId`: `mini-balabala`
+- CSS 前缀: `.wash-label--mini-balabala`
+- 默认数据: `createMiniBalabalaLabelData()`
+
+## 规格
+
+- 25×56mm；顶缝 10mm；**无 Logo**
+- `careLayout: 'mini-centered'` — 洗涤说明区居中，不可干洗以下逐行居中
+- 中文：**不显示「成分」标题**；全文加粗
+- 洗涤区 `margin-top: auto` 整体偏下
+- **阿语成分块：无上下黑线**（`arabicBlockBorder: 'none'`）
+- 洗护图标 5 个：手洗、不可漂白、阴凉处平摊晾干、低温熨烫 + 不可干洗自动
+
+## 修改时勿动
+
+- 不要把巴拉/羽绒的 Logo、充绒量表格、阿语黑线逻辑套用到本模板
+- 共享组件里用 `template.layout.careLayout === 'mini-centered'` 分支，勿改全局默认

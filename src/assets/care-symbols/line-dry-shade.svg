@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6.8 7.13" aria-hidden="true">
+  <defs>
+    <style>
+      .st0 {
+        fill: none;
+        stroke: #231815;
+        stroke-miterlimit: 10;
+        stroke-width: .34px;
+      }
+    </style>
+  </defs>
+  <rect class="st0" x=".17" y=".17" width="6.46" height="6.79" />
+  <line class="st0" x1="1.49" y1="3.59" x2="5.31" y2="3.59" />
+  <line class="st0" x1=".17" y1=".17" x2="2.35" y2="2.35" />
+</svg>

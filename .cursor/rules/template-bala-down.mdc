@@ -1,0 +1,26 @@
+---
+description: bala-羽绒洗唛模板维护规范
+globs: src/templates/index.ts,src/utils/labelDefaults.ts,src/components/DownJacketEditor.tsx,src/components/DownFillGrid.tsx,src/components/WashLabelSections.tsx,src/App.css
+alwaysApply: false
+---
+
+# bala-羽绒模板 bala-down
+
+## 标识
+
+- `TemplateId`: `bala-down`
+- CSS 前缀: `.wash-label--bala-down`
+- 默认数据: `createBalaDownLabelData()`
+- `compositionMode: 'down-jacket'`
+
+## 规格
+
+- 25×70mm；顶缝 10mm；显示 Logo
+- 羽绒成分：面料/挂面、里料、填充物 + **充绒量表格**（可编辑尺码列）
+- 阿语成分块：`arabicBlockBorder: 'solid'`（上下黑线）
+- 编辑区用 `DownJacketEditor`，不用 `MaterialEditor`
+
+## 修改时勿动
+
+- 标准模板的 `COMPOSITION_PARTS` / 迷你巴拉居中洗涤逻辑
+- 充绒量表格组件与 `downJacket` 字段仅本模板及 `LabelData` 类型使用

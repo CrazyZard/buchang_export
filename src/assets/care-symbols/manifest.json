@@ -1,0 +1,55 @@
+[
+  {
+    "key": "handWash",
+    "name": "hand-wash",
+    "label": "手洗",
+    "file": "hand-wash.svg",
+    "source": "illustrator"
+  },
+  {
+    "key": "doNotBleach",
+    "name": "do-not-bleach",
+    "label": "不可漂白",
+    "file": "do-not-bleach.svg",
+    "source": "illustrator"
+  },
+  {
+    "key": "lineDryShade",
+    "name": "line-dry-shade",
+    "label": "阴凉处平摊晾干",
+    "file": "line-dry-shade.svg",
+    "source": "illustrator"
+  },
+  {
+    "key": "dripFlatDrying",
+    "name": "drip-flat-drying",
+    "label": "平摊晾干",
+    "file": "drip-flat-drying.svg",
+    "source": "illustrator"
+  },
+  {
+    "key": "ironLowTemp",
+    "name": "iron-low-temp",
+    "label": "低温熨烫",
+    "file": "iron-low-temp.svg",
+    "source": "illustrator"
+  },
+  {
+    "key": "doNotIron",
+    "name": "do-not-iron",
+    "label": "不可熨烫",
+    "file": "do-not-iron.svg",
+    "source": "illustrator"
+  },
+  {
+    "key": "doNotDryClean",
+    "name": "do-not-dry-clean",
+    "label": "不可干洗",
+    "file": "do-not-dry-clean.svg",
+    "source": "illustrator",
+    "autoMatch": {
+      "field": "dryCleanNote",
+      "includes": "不可干洗"
+    }
+  }
+]

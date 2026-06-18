@@ -1,0 +1,65 @@
+---
+description: 洗唛 PDF 导出转曲管线规范（DOM→SVG→opentype→PDF），改一块勿坏另一块
+globs: src/utils/exportPdf.ts,src/utils/exportText*.ts,src/utils/svgTextToPaths*.ts,src/utils/flattenExportTextSpans.ts,src/utils/textScriptDetect.ts,src/utils/arabicTextExport.ts,src/utils/verifyDigitExport.ts,src/utils/labelTextRender.tsx
+alwaysApply: false
+---
+
+# 导出转曲管线
+
+链路：`预览 DOM(.export-capture) → flattenInlineTextSpans → dom-to-svg → 去 textLength → prepareSvgTextForPathConvert → convertSvgTextToPaths(opentype) → svg2pdf → PDF`。
+
+核心问题：dom-to-svg 把 `36.6` 拆成 `3`+`6.6`，去 `textLength` 后同坐标叠画 → 黑点/叠字/字距异常。整套逻辑都为消除它。
+
+## 字体规范（铁律，不容更改）
+
+| 内容 | 字体 |
+|------|------|
+| **所有数字（中文稿/翻译区/阿语行内，含小数点）** | **GO.TTF** |
+| **所有 `%`** | **FZ.TTF**（中文字体，绝不用 GO） |
+| 中文文字、中文标点 | FZ.TTF |
+| 英/俄（西里尔）字母 | GO.TTF |
+| 阿拉伯字母 | ARIAL.TTF |
+
+> 中文成分行 `36.6%锦纶`：`36.6`→GO，`%`→FZ，`锦纶`→FZ。
+> 俄文 `57.7%нитрон`：`57.7`→GO，`%`→FZ，`нитрон`→GO。
+> 阿语 `57.7%أكريليك`：`57.7`→GO，`%`→FZ，阿拉伯字母→ARIAL。
+> 导出 `appendZhUnifiedTextPath`：数字段 GO + 其余按字形拆分（`%`/中文→FZ，西里尔/拉丁→GO）。
+> 导出 `appendArabicVisualPath`：bidi 视觉串按字符分字体（数字→GO、`%`→FZ、阿拉伯→ARIAL）逐段缩放转曲。
+> **勿整段 FZ、勿把 % 画成 GO、勿让阿语数字用 ARIAL。**
+> 同步：基础文档 `AGENTS.md` 顶部「字体规范（铁律）」。
+
+## 六种导出块（互不影响）
+
+分类在 `exportTextBlockKind.ts`；prepare 在 `exportTextPrepare.ts`；render 在 `exportTextRender.ts`。
+**改某语言/布局只动它那一块的 prepare/render，勿让它走别的块的合并或锚点逻辑。**
+
+| 块 | 内容 | 要点 |
+|----|------|------|
+| `zh-composition` | `36.6%锦纶` | 合并误拆 tspan；**数字段 GO + %/中文 FZ 分段** |
+| `ltr-grid-head` | `57.7%` | 数字 tspan 压平；**GO 数字 + FZ %** |
+| `ltr-grid-body` | `нитрон`/`Acrylic` | **整段 GO 单 path**；不参与数字叠字合并 |
+| `ltr-translated` | inline-wrap 等 | GO+FZ % 或整段 GO |
+| `arabic-rtl` | `57.7%أكريليك` | 右锚 RTL 反排；**跳过 LTR 数字合并** |
+| `generic-ltr` | 货号等 | 通用 LTR |
+
+## 不可破坏的约束
+
+- **grid 比例列(head)与材质列(body)是两列**：压平时分列压（`flattenLtrGridToken`），转曲时分列画。**禁止**合成 `57.7%нитрон` 一行，否则俄文字距/列对齐与预览不符。
+- **阿语整段 RTL（纯矢量）**：opentype.js 不做 bidi/RTL/连写，**不能**直接 getPath 阿拉伯。流程：
+  1. `captureExportGeometry`（删 textLength 前）把每行右缘 `tspan.x+textLength` 存进 `data-ex-right`、左缘存 `data-ex-left`
+  2. `reshapeArabic`（`arabicShaping.ts`）按上下文映射到 Unicode 呈现形（initial/medial/final + lam-alef），ARIAL.TTF 含这些字形
+  3. `toArabicVisualString`（`arabicVisualOrder.ts`，用 `bidi-js`）做 UAX#9 bidi 重排得视觉序（数字在右、阿拉伯在左）
+  4. `appendArabicVisualPath` 用 ARIAL 逐字形转曲，并按 `[data-ex-left, data-ex-right]` 横向缩放，精确贴合预览宽度
+  - 实测阿语 path 落点与 dom-to-svg 量得区间一致；勿改回 opentype 直接 getPath 阿拉伯。
+- **数字叠字合并只服务** `zh-composition` / `ltr-grid-head` / LTR 翻译数字碎片；**含阿语的文本一律跳过**。
+- **绝不直接 mutate `font.getPath(...)` 返回的 `path.commands`**：opentype 的 commands 共享字体 glyph 缓存，原地改写会污染字形缓存，导致后续用同字体画该字形时坐标错乱（曾导致中文 `3` 跑飞、`6.6` 消失）。阿语横向缩放须用 SVG `<g transform="translate scale">`（见 `appendArabicVisualPath`），或导出前 `resetExportFontCache()` 重载字体。回归用例 `testArabicDoesNotPolluteLatinGlyphs` / `testZhCompositionDigitBBox`。
+- 预览侧 `useLatinDigits = !forExport`：预览拆 `label-latin`+`composition-percent`，导出不拆。
+
+## 改动后必须
+
+```bash
+npm run verify:digit-export   # 叠字 + 阿语锚点回归
+npm run build
+```
+
+新增/调整块类型时，同步更新 `exportTextBlockKind.ts`、对应 prepare/render，以及 `verifyDigitExport.ts` 用例。

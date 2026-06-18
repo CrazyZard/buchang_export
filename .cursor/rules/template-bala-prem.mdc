@@ -1,0 +1,22 @@
+---
+description: bala-prem 洗唛模板维护规范
+globs: src/templates/index.ts,src/utils/labelDefaults.ts,src/components/WashLabelSections.tsx,src/App.css
+alwaysApply: false
+---
+
+# bala-prem 模板
+
+## 标识
+
+- `TemplateId`: `bala-prem`
+- CSS 前缀: `.wash-label--bala-prem`
+- 默认数据: 暂与巴拉相同 `createBalabalaLabelData()`
+
+## 规格
+
+- 与巴拉相近：顶缝 8mm、显示 Logo、`arabicBlockBorder: 'solid'`
+- 专属样式请写在 `.wash-label--bala-prem` 下，勿改 `.wash-label--balabala` 除非两模板同步
+
+## 待定制
+
+- 独立 Logo / 默认成分 / 字号差异在此模板配置与 CSS 中扩展

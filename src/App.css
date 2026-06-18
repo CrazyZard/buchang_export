@@ -1,0 +1,1891 @@
+@font-face {
+  font-family: 'FZ';
+  src: url('/fonts/FZ.TTF') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'GO';
+  src: url('/fonts/GO.TTF') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ARIAL';
+  src: url('/fonts/ARIAL.TTF') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --bg: #f4f6f8;
+  --surface: #ffffff;
+  --border: #d8dee6;
+  --text: #1a1f26;
+  --muted: #5f6b7a;
+  --primary: #c41e3a;
+  --primary-soft: #fdecef;
+  --label-width: 25mm;
+  --label-head-seam: 8mm;
+  /* Logo 尺寸：相对洗唛宽度 25mm（宽 90%，高按裁切 viewBox 比例） */
+  --label-brand-logo-width: calc(var(--label-width) * 0.9);
+  --label-brand-logo-height: calc(var(--label-brand-logo-width) * 15.9 / 57.95);
+  --label-brand-logo-height-down: calc(var(--label-width) * 0.152);
+  --font-zh: 'FZ', 'SimSun', '宋体', serif;
+  --font-latin: 'GO', sans-serif;
+  --font-arabic: 'ARIAL', Arial, sans-serif;
+  --size-zh-composition: 4.5pt;
+  --size-zh-care: 5pt;
+  --size-zh-product-code: 5pt;
+  --size-product-code: 5pt;
+  --label-care-bottom-gap: 4mm;
+  --label-care-symbols-gap: 0.35mm;
+  --label-care-symbol-size: 3mm;
+  --label-care-symbol-gap: 0.3mm;
+  --size-zh: var(--size-zh-composition);
+  --size-latin: 4pt;
+  --size-translated: 4pt;
+  --size-translated-product-code: 5pt;
+  --size-arabic: 4pt;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.back-link:hover {
+  color: var(--primary);
+}
+
+.home-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+  background:
+    radial-gradient(circle at top, rgba(196, 30, 58, 0.08), transparent 42%),
+    var(--bg);
+}
+
+.home-page-main {
+  width: min(100%, 720px);
+  text-align: center;
+}
+
+.home-brand {
+  margin: 0;
+  font-size: clamp(2.8rem, 8vw, 4.5rem);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--text);
+}
+
+.home-subtitle {
+  margin: 12px 0 40px;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.template-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.template-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 120px;
+  padding: 24px 20px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.template-card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 10px 28px rgba(196, 30, 58, 0.12);
+  transform: translateY(-2px);
+}
+
+.template-card-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.template-card-desc {
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+
+.app {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.app-header h1 {
+  margin: 0 0 4px;
+  font-size: 1.6rem;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.scale-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.scale-control input {
+  width: 120px;
+}
+
+.dictionary-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.language-selector,
+.export-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.language-selector-header,
+.export-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.language-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  flex: 1;
+  justify-content: center;
+}
+
+.language-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.language-actions,
+.export-actions,
+.dictionary-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.btn-link {
+  border: none;
+  background: none;
+  color: var(--primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0;
+}
+
+.export-capture {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  pointer-events: none;
+  z-index: -1;
+  width: max-content;
+}
+
+.export-capture-column {
+  display: flex;
+  flex-direction: column;
+}
+
+/* PDF 导出：完整渲染，避免 overflow 裁切翻译文字 */
+.export-capture .wash-label--export,
+.export-capture .wash-label--export * {
+  overflow: visible !important;
+}
+
+.export-capture .wash-label--export .part-label {
+  text-overflow: clip !important;
+  white-space: nowrap;
+}
+
+/* 导出区 Logo：与洗唛同用 25mm 变量，避免 dom-to-svg 缩放失真 */
+.export-capture .label-brand .inline-svg-host {
+  display: block;
+  width: var(--label-brand-logo-width);
+  height: var(--label-brand-logo-height);
+  max-height: none;
+  margin: 0 auto;
+}
+
+.export-capture .label-brand .inline-svg-host svg.label-brand-logo {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  display: block;
+}
+
+.export-capture .wash-label--bala-down .label-brand .inline-svg-host {
+  height: var(--label-brand-logo-height-down);
+}
+
+.export-capture .wash-label--export .box-cell-line,
+.export-capture .wash-label--export .label-box-footer {
+  overflow: visible !important;
+}
+
+/* 导出时隐藏 flex spacer，用固定 margin 代替，避免 minHeight 同步后撑出白色块 */
+.export-capture .wash-label--export .label-composition-care-spacer {
+  display: none !important;
+}
+
+.export-capture .wash-label--balabala.wash-label--source .label-section--composition + .label-section--care,
+.export-capture .wash-label--balabala.wash-label--source .label-section--care {
+  margin-top: 1em !important;
+}
+
+/* 导出压平前消除 flex column-gap，避免 dom-to-svg 拆成多段宽间距 text */
+.export-capture .wash-label--export .composition-block--inline-wrap .composition-token {
+  column-gap: 0 !important;
+  row-gap: 0 !important;
+}
+
+/* live 导出：单文本框保留换行与行内空格 */
+.export-capture .live-export-single-text,
+.composition-plain {
+  white-space: normal;
+  word-break: break-word;
+}
+
+.export-capture .live-export-single-text.composition-plain,
+.export-capture .composition-plain {
+  white-space: pre-wrap;
+}
+
+.composition-plain-line {
+  display: block;
+}
+
+/* 首行含部位标签：软折行悬挂缩进，续行与材质列对齐 */
+.composition-plain-line--hanging {
+  padding-inline-start: calc(var(--composition-align-ch, 0) * 1ch);
+  text-indent: calc(-1 * var(--composition-align-ch, 0) * 1ch);
+}
+
+.composition-plain-line--continuation {
+  padding-inline-start: calc(var(--composition-align-ch, 0) * 1ch);
+}
+
+.care-advice-live {
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+.care-advice-live--pre-line {
+  white-space: pre-wrap;
+}
+
+.wash-label--source .label-source-advice .care-advice-live {
+  width: 100%;
+}
+
+.wash-label--source .composition-plain-line--hanging,
+.wash-label--source .composition-plain-line--continuation {
+  padding-inline-start: calc(var(--composition-align-ch, 0) * 1em);
+}
+
+.wash-label--source .composition-plain-line--hanging {
+  text-indent: calc(-1 * var(--composition-align-ch, 0) * 1em);
+}
+
+.wash-label--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40mm;
+  color: #999;
+  text-align: center;
+  padding: 2mm;
+}
+
+.dict-label {
+  font-weight: 600;
+  margin-right: 10px;
+}
+
+.dict-meta {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.btn-primary,
+.btn-secondary,
+.btn-add,
+.btn-remove {
+  border: none;
+  cursor: pointer;
+  font: inherit;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 8px;
+}
+
+.btn-secondary {
+  background: #eef1f5;
+  color: var(--text);
+  padding: 8px 14px;
+  border-radius: 8px;
+}
+
+.label-workspace {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px 24px;
+  overflow-x: auto;
+}
+
+.workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(360px, 1fr) max-content max-content;
+  grid-template-rows: auto 1fr;
+  gap: 12px 20px;
+  align-items: start;
+}
+
+.workspace-col-head {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--border);
+  text-align: center;
+}
+
+.workspace-col-head:nth-child(2),
+.workspace-col-head:nth-child(3) {
+  font-size: 0.8rem;
+}
+
+.workspace-col-head:first-child {
+  text-align: left;
+}
+
+.workspace-col-head small {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.workspace-editor {
+  grid-column: 1;
+  grid-row: 2;
+  min-width: 0;
+  padding-right: 8px;
+}
+
+.workspace-preview {
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-start;
+  width: max-content;
+  max-width: 100%;
+}
+
+.preview-size-badge {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.workspace-preview--source {
+  grid-column: 2;
+}
+
+.workspace-preview--translated {
+  grid-column: 3;
+}
+
+.preview-scale-slot {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.preview-scale-inner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: var(--label-width);
+}
+
+.edit-section {
+  padding: 14px 0;
+  border-bottom: 1px dashed var(--border);
+}
+
+.edit-section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.edit-section:first-child {
+  padding-top: 0;
+}
+
+.edit-section-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--primary);
+  margin-bottom: 10px;
+}
+
+.footer-codes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.composition-footnote {
+  margin-top: 0.15mm;
+  line-height: 1.12;
+}
+
+.composition-section-title {
+  margin-bottom: 0.1mm;
+  line-height: 1.12;
+}
+
+.composition-paste {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.composition-paste-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.batch-excel-import {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.batch-excel-import-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.batch-excel-import-title {
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.batch-excel-import-meta {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.batch-excel-import-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.batch-preview-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.batch-preview-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.batch-preview-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  max-width: 100%;
+}
+
+.batch-preview-item-index {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.batch-preview-item-title,
+.batch-preview-item-code {
+  font-variant-numeric: tabular-nums;
+}
+
+.workspace-preview--batch {
+  align-items: stretch;
+  min-height: 0;
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-right: 4px;
+}
+
+.workspace-grid--batch {
+  align-items: stretch;
+  min-height: 0;
+  max-height: calc(100vh - 200px);
+  overflow: hidden;
+}
+
+.workspace-grid--batch .workspace-editor {
+  min-height: 0;
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.material-editor {
+  margin-bottom: 0;
+}
+
+.material-group {
+  margin-bottom: 10px;
+  padding: 10px;
+  background: #fafbfc;
+  border-radius: 8px;
+}
+
+.material-group:last-child {
+  margin-bottom: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.88rem;
+}
+
+.field--full {
+  grid-column: 1 / -1;
+}
+
+.field span {
+  color: var(--muted);
+}
+
+.field input,
+.field textarea,
+.material-row input {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+}
+
+.section-title {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+}
+
+.material-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.fixed-label {
+  font-weight: 600;
+}
+
+.btn-add {
+  background: var(--primary-soft);
+  color: var(--primary);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+}
+
+.material-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.material-row {
+  display: grid;
+  grid-template-columns: 72px 1fr 32px;
+  gap: 8px;
+  align-items: center;
+}
+
+.input-percentage {
+  text-align: center;
+}
+
+.btn-remove {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: #fee;
+  color: #b33;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.empty-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.care-symbol-picker {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 0;
+  width: 100%;
+}
+
+.care-symbol-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  min-width: 44px;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.care-symbol-btn .inline-svg-host,
+.care-symbol-btn .care-symbol-img {
+  pointer-events: none;
+  width: 22px;
+  height: 22px;
+  max-height: none;
+  margin: 0;
+}
+
+.care-symbol-btn.active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.care-symbol-btn--auto {
+  cursor: default;
+  opacity: 0.92;
+}
+
+.care-symbol-btn--auto:disabled {
+  opacity: 1;
+}
+
+.care-symbol-btn img,
+.care-symbol img,
+.care-symbol-img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  display: block;
+}
+
+.care-symbol .inline-svg-host {
+  display: contents;
+}
+
+.care-symbols--sm .care-symbol-img,
+.care-symbols--sm .care-symbol img,
+.care-symbols--sm .inline-svg-host svg {
+  width: var(--label-care-symbol-size);
+  height: var(--label-care-symbol-size);
+  max-width: var(--label-care-symbol-size);
+  max-height: var(--label-care-symbol-size);
+}
+
+.wash-label {
+  width: var(--label-width);
+  max-width: var(--label-width);
+  padding: 0 1mm 1.2mm;
+  border: 1px solid var(--primary);
+  background: #fff;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  overflow-x: hidden;
+  color: #000;
+  line-height: 1.15;
+  letter-spacing: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 中文预览：FZ；成分 4.5pt 为基准，洗涤说明/建议 5pt（可随内容整体缩小） */
+.wash-label--source {
+  font-family: var(--font-zh);
+  font-size: var(--size-zh-composition);
+  padding-left: calc(1mm + 2px);
+  padding-bottom: var(--label-care-bottom-gap);
+  box-sizing: border-box;
+}
+
+.wash-label--balabala.wash-label--source {
+  min-height: 54mm;
+  font-size: 5pt;
+}
+
+/* 巴拉中文：成分/洗涤/脚注/款号统一 5pt，不相对放大或缩小 */
+.wash-label--balabala.wash-label--source .label-section--care,
+.wash-label--balabala.wash-label--source .label-footer {
+  font-size: 1em;
+}
+
+.wash-label--balabala.wash-label--source .footer-made-in {
+  font-size: 1em;
+}
+
+/* 巴拉：标准洗涤建议单 div 内按样稿断行（左对齐） */
+.wash-label--balabala.wash-label--source .label-source-advice--pre-line {
+  white-space: pre-line;
+  box-sizing: border-box;
+  width: calc(100% + 2px);
+  margin-left: -2px;
+  text-align: left;
+  text-justify: auto;
+  letter-spacing: 0;
+  word-spacing: 0;
+}
+
+.wash-label--balabala.wash-label--source .label-section--care .label-source-advice {
+  text-align: left;
+  text-justify: auto;
+  overflow-wrap: normal;
+  word-break: normal;
+  line-break: auto;
+}
+
+.care-advice-tail {
+  white-space: nowrap;
+}
+
+.wash-label--bala-down.wash-label--source {
+  min-height: 70mm;
+}
+
+.wash-label--source .label-section--composition {
+  font-size: 1em;
+  flex: 0 0 auto;
+}
+
+.wash-label--source .label-section--care {
+  font-size: calc(var(--size-zh-care) / var(--size-zh-composition) * 1em);
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
+.wash-label--source .label-footer {
+  font-size: 1em;
+  flex-shrink: 0;
+}
+
+/* 数字 / 英文 / 俄文：GO；与同行中文/% 同字号 */
+.label-latin,
+.label-font-latin {
+  font-family: var(--font-latin);
+}
+
+.wash-label--source .label-latin,
+.wash-label--source .label-font-latin {
+  vertical-align: baseline;
+}
+
+/* % 与中文同字体 FZ */
+.label-zh,
+.composition-percent {
+  font-family: var(--font-zh);
+}
+
+/* 阿拉伯：ARIAL 4pt */
+.label-font-arabic {
+  font-family: var(--font-arabic);
+  font-size: 1em;
+  direction: rtl;
+  text-align: right;
+}
+
+.label-font-arabic.rtl {
+  direction: rtl;
+  text-align: right;
+}
+
+.wash-label--source .label-source-title {
+  font-weight: 400;
+  line-height: 1.15;
+  margin: 0 0 0.35mm;
+}
+
+.wash-label--source .label-section--composition .label-source-title,
+.wash-label--source .label-section--composition .label-source-body,
+.wash-label--source .label-section--composition .composition-line,
+.wash-label--source .label-section--composition .composition-token,
+.wash-label--source .label-section--composition .part-label,
+.wash-label--source .label-section--composition .composition-section-title,
+.wash-label--source .label-section--composition .composition-footnote {
+  font-size: 1em;
+  font-weight: 400;
+  line-height: 1.15;
+}
+
+.wash-label--source .label-section--care .label-source-title,
+.wash-label--source .label-section--care .label-source-emphasis,
+.wash-label--source .label-section--care .label-source-advice,
+.wash-label--source .label-section--care .label-source-advice-line {
+  font-size: 1em;
+  font-weight: 400;
+  line-height: 1.15;
+}
+
+.wash-label--source .label-section--care .label-source-title {
+  margin-bottom: 0.2mm;
+}
+
+.wash-label--source .label-section--care .care-symbols {
+  margin-top: var(--label-care-symbols-gap);
+  margin-bottom: 0.35mm;
+}
+
+.wash-label--source .label-section--care .label-source-emphasis {
+  margin-top: 0.35mm;
+}
+
+.wash-label--source .label-section--care .label-source-advice {
+  line-height: 1.14;
+  margin-top: 0.25mm;
+  text-align: justify;
+}
+
+.wash-label--source .footer-made-in {
+  font-size: 1.1em;
+}
+
+.wash-label--source .product-codes.label-latin {
+  font-family: var(--font-latin);
+  font-size: var(--size-product-code);
+  margin-top: 0.3mm;
+  line-height: 1.1;
+}
+
+/* 外文区基准 4pt，GO / Arial（阿语） */
+.wash-label--translated {
+  font-family: var(--font-latin);
+  font-size: var(--size-translated);
+  line-height: 1.12;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+/* 翻译区正文默认 4pt；款号/工厂代码见 .product-codes */
+.wash-label--translated .label-latin,
+.wash-label--translated .label-font-latin,
+.wash-label--translated .label-font-arabic,
+.wash-label--translated .label-translated-title,
+.wash-label--translated .label-translated-body,
+.wash-label--translated .label-translated-wash-head,
+.wash-label--translated .label-translated-wash-line,
+.wash-label--translated .label-translated-wash-line--russian,
+.wash-label--translated .label-box-footer,
+.wash-label--translated .box-cell-line,
+.wash-label--translated .down-fill-grid-title,
+.wash-label--translated .down-fill-grid-table {
+  font-size: 1em;
+}
+
+.wash-label--translated .lang-block,
+.wash-label--translated .label-translated-body,
+.wash-label--translated .label-section,
+.wash-label--translated .label-box-footer,
+.wash-label--translated .composition-block--translated {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.wash-label--translated .label-translated-title {
+  font-weight: 400;
+  line-height: 1.12;
+  margin: 0 0 0.2mm;
+}
+
+.wash-label--translated .label-translated-body {
+  line-height: 1.12;
+}
+
+.wash-label--translated .composition-plain {
+  display: block;
+  line-height: 1.12;
+}
+
+.wash-label--translated .composition-plain-line--hanging,
+.wash-label--translated .composition-plain-line--continuation {
+  padding-inline-start: calc(var(--composition-align-ch, 0) * 1ch);
+}
+
+.wash-label--translated .composition-plain-line--hanging {
+  text-indent: calc(-1 * var(--composition-align-ch, 0) * 1ch);
+}
+
+.wash-label--translated .lang-block.rtl .composition-plain {
+  text-align: right;
+  direction: rtl;
+  unicode-bidi: plaintext;
+}
+
+.wash-label--translated .lang-block.rtl .composition-plain-line--hanging,
+.wash-label--translated .lang-block.rtl .composition-plain-line--continuation {
+  padding-inline-start: calc(var(--composition-align-ch, 0) * 1ch);
+}
+
+.wash-label--translated .lang-block.rtl .composition-plain-line--hanging {
+  text-indent: calc(-1 * var(--composition-align-ch, 0) * 1ch);
+}
+
+.wash-label--translated .composition-block--translated {
+  display: block;
+  margin-bottom: 0.2mm;
+}
+
+.wash-label--translated .composition-block--translated .composition-line {
+  display: block;
+  text-align: start;
+  line-height: 1.12;
+}
+
+.wash-label--translated .composition-block--translated .part-label {
+  display: inline;
+  white-space: nowrap;
+}
+
+.wash-label--translated .composition-block--translated .composition-token {
+  display: inline;
+  word-break: break-word;
+}
+
+.wash-label--translated .composition-block--translated .composition-line--head .composition-token {
+  display: block;
+}
+
+.wash-label--translated .lang-block.rtl .composition-block--translated .composition-line {
+  text-align: right;
+}
+
+.wash-label--translated .composition-block--translated .part-label {
+  font-weight: 400;
+}
+
+.wash-label--translated .composition-block--translated .composition-token {
+  font-weight: 400;
+}
+
+/* 巴拉：标签列 + 内容列，换行与上一行材质起始位置对齐 */
+.wash-label--balabala.wash-label--translated .composition-block--translated.composition-block--inline-wrap,
+.wash-label--balabala.wash-label--translated .composition-block--translated.composition-block--grid-align {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  column-gap: 0;
+  align-items: start;
+  width: 100%;
+  max-width: 100%;
+}
+
+.wash-label--balabala.wash-label--translated .composition-block--translated.composition-block--inline-wrap .composition-line,
+.wash-label--balabala.wash-label--translated .composition-block--translated.composition-block--grid-align .composition-line {
+  display: contents;
+}
+
+.wash-label--balabala.wash-label--translated .composition-block--translated.composition-block--inline-wrap .part-label,
+.wash-label--balabala.wash-label--translated .composition-block--translated.composition-block--grid-align .part-label,
+.wash-label--balabala.wash-label--translated .composition-block--translated.composition-block--grid-align .part-label--continuation {
+  grid-column: 1;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wash-label--balabala.wash-label--translated .composition-block--translated.composition-block--grid-align .part-label--continuation {
+  /* 占位：续行材质与首行材质列对齐，避免换行后顶到洗唛左缘 */
+  visibility: hidden;
+  min-height: 1px;
+}
+
+.wash-label--balabala.wash-label--translated .composition-block--translated.composition-block--inline-wrap .composition-token {
+  grid-column: 2;
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.35em;
+  row-gap: 0;
+  word-break: normal;
+  overflow-wrap: break-word;
+  line-break: strict;
+}
+
+.wash-label--balabala.wash-label--translated .composition-block--translated.composition-block--grid-align .composition-token {
+  grid-column: 2;
+  min-width: 0;
+  max-width: 100%;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 0.35em;
+  align-items: baseline;
+  box-sizing: border-box;
+  line-height: 1.12;
+}
+
+.wash-label--balabala.wash-label--translated
+  .composition-block--translated.composition-block--grid-align
+  .composition-material-head {
+  grid-column: 1;
+  white-space: nowrap;
+}
+
+.wash-label--balabala.wash-label--translated
+  .composition-block--translated.composition-block--grid-align
+  .composition-material-body {
+  grid-column: 2;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.wash-label--balabala.wash-label--translated
+  .composition-block--translated.composition-block--grid-align
+  .composition-material-head
+  .label-latin {
+  white-space: nowrap;
+}
+
+.wash-label--balabala.wash-label--translated .lang-block.rtl .composition-block--grid-align .composition-token,
+.wash-label--balabala.wash-label--translated .lang-block.rtl .composition-block--inline-wrap .composition-token {
+  direction: rtl;
+  unicode-bidi: plaintext;
+}
+
+/* 阿语成分：不分列（覆盖 grid），让拆出的数字 GO / % FZ 与阿拉伯字母正常 RTL 同流 */
+.wash-label--balabala.wash-label--translated .lang-block.rtl .composition-block--grid-align .composition-token {
+  display: block;
+}
+
+.wash-label--balabala.wash-label--translated .composition-block--inline-wrap .composition-material-unit {
+  white-space: nowrap;
+  flex: 0 1 auto;
+  max-width: 100%;
+}
+
+.wash-label--balabala .composition-material-unit {
+  white-space: nowrap;
+  display: inline;
+}
+
+.wash-label--balabala.wash-label--source .composition-block .composition-token.composition-material-unit {
+  white-space: nowrap;
+}
+
+.wash-label--translated .label-translated-wash-head {
+  text-align: center;
+  margin-bottom: 0.25mm;
+  line-height: 1.12;
+}
+
+.translated-label-graphic {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.translated-label-graphic .inline-svg-host {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+
+.translated-label-graphic svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.translated-label-graphic--washing svg {
+  max-height: 3.6mm;
+}
+
+.translated-label-graphic--dry-clean svg {
+  max-height: 3.2mm;
+}
+
+.wash-label--translated .label-translated-wash-line {
+  display: block;
+  font-weight: 400;
+}
+
+.wash-label--translated .label-translated-wash-line--russian {
+  letter-spacing: -0.02em;
+}
+
+.wash-label--translated .label-translated-wash-head .label-font-arabic {
+  text-align: center;
+  direction: rtl;
+  unicode-bidi: isolate;
+}
+
+.wash-label--translated .label-box-footer {
+  font-weight: 400;
+  margin-left: 0;
+  margin-right: 0;
+  width: 100%;
+}
+
+.wash-label--translated .box-cell-line {
+  font-weight: 400;
+  line-height: 1.18;
+  padding: 0.35mm 0.5mm;
+  text-align: center;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.wash-label--balabala.wash-label--translated .box-cell-line {
+  line-height: 1.08;
+  padding: 0.12mm 0.5mm;
+}
+
+.wash-label--translated .label-box-footer__dry-clean {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.wash-label--translated .box-cell-line--made-in.box-cell-line--english {
+  white-space: normal;
+  letter-spacing: -0.02em;
+  overflow-wrap: break-word;
+}
+
+.wash-label--translated .box-cell-line--russian {
+  white-space: normal;
+  letter-spacing: -0.02em;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.wash-label--translated .box-cell-line.label-font-arabic {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.15;
+}
+
+.wash-label--translated .lang-block.rtl.lang-block--arabic-bordered {
+  border-top: 1px solid #333;
+  border-bottom: 1px solid #333;
+  margin: 0.35mm 0;
+  padding: 0.15mm 0;
+  box-sizing: border-box;
+}
+
+.wash-label--translated .product-codes.label-font-latin {
+  font-size: var(--size-product-code);
+  font-weight: 700;
+}
+
+.wash-label--balabala {
+  --label-head-seam: 8mm;
+  --label-brand-logo-width: calc(var(--label-width) * 0.72);
+  --label-brand-logo-height: calc(var(--label-brand-logo-width) * 15.9 / 57.95);
+}
+
+.wash-label--balabala.wash-label--source .product-codes.label-latin {
+  font-size: var(--size-product-code);
+  font-weight: 400;
+}
+
+.wash-label--balabala.wash-label--translated .product-codes.label-font-latin {
+  font-weight: 400;
+}
+
+.wash-label--mini-balabala {
+  --label-head-seam: 10mm;
+}
+
+.wash-label--mini-balabala.wash-label--source {
+  min-height: 56mm;
+}
+
+.wash-label--mini-balabala.wash-label--source .label-section--composition {
+  flex: 0 0 auto;
+}
+
+/* 迷你巴拉中文预览：不显示「成分」标题，全文加粗 */
+.wash-label--mini-balabala.wash-label--source .label-section--composition > .label-source-title {
+  display: none;
+}
+
+.wash-label--mini-balabala.wash-label--source,
+.wash-label--mini-balabala.wash-label--source .label-source-title,
+.wash-label--mini-balabala.wash-label--source .label-source-body,
+.wash-label--mini-balabala.wash-label--source .composition-line,
+.wash-label--mini-balabala.wash-label--source .composition-token,
+.wash-label--mini-balabala.wash-label--source .part-label,
+.wash-label--mini-balabala.wash-label--source .label-source-emphasis,
+.wash-label--mini-balabala.wash-label--source .label-source-advice-line,
+.wash-label--mini-balabala.wash-label--source .footer-made-in {
+  font-weight: 700;
+}
+
+.wash-label--mini-balabala.wash-label--source .label-latin,
+.wash-label--mini-balabala.wash-label--source .product-codes.label-latin {
+  font-weight: 700;
+}
+
+.wash-label--mini-balabala.wash-label--source .label-section--composition + .label-section--care {
+  margin-top: auto;
+  padding-top: 0;
+}
+
+.wash-label--mini-balabala.wash-label--source .label-section--care-mini .label-source-title {
+  margin-top: 0.2mm;
+}
+
+/* 迷你巴拉：洗涤说明区整体居中，不可干洗以下逐行居中 */
+.wash-label--mini-balabala.wash-label--source .label-section--care-mini {
+  text-align: center;
+  align-items: center;
+}
+
+.wash-label--mini-balabala.wash-label--source .label-section--care-mini .label-source-title,
+.wash-label--mini-balabala.wash-label--source .label-section--care-mini .label-source-emphasis,
+.wash-label--mini-balabala.wash-label--source .label-section--care-mini .label-source-advice-line,
+.wash-label--mini-balabala.wash-label--source .label-section--care-mini .label-source-care-footer,
+.wash-label--mini-balabala.wash-label--source .label-section--care-mini .footer-made-in,
+.wash-label--mini-balabala.wash-label--source .label-section--care-mini .product-codes {
+  width: 100%;
+  text-align: center;
+}
+
+.wash-label--mini-balabala.wash-label--source .label-section--care-mini .care-symbols {
+  justify-content: space-evenly;
+  width: 100%;
+}
+
+.wash-label--mini-balabala.wash-label--source .label-section--care-mini .label-source-emphasis {
+  margin-top: 0.3mm;
+}
+
+.wash-label--mini-balabala.wash-label--source .label-section--care-mini .label-source-advice-lines {
+  width: 100%;
+  margin-top: 0.15mm;
+}
+
+.wash-label--mini-balabala.wash-label--source .label-section--care-mini .label-source-advice-line {
+  line-height: 1.14;
+}
+
+.wash-label--mini-balabala.wash-label--source .label-section--care-mini .label-source-care-footer {
+  margin-top: 0.25mm;
+}
+
+.wash-label--mini-balabala.wash-label--source .label-section--care-mini .footer-made-in {
+  font-size: 1em;
+}
+
+.wash-label--mini-balabala.wash-label--source .label-section--care-mini .product-codes.label-latin {
+  font-size: var(--size-product-code);
+  margin-top: 0.2mm;
+  line-height: 1.1;
+}
+
+.wash-label--mini-balabala.wash-label--translated .label-footer {
+  text-align: center;
+}
+
+.wash-label--bala-down {
+  --label-head-seam: 10mm;
+}
+
+.wash-label--bala-down .label-brand .inline-svg-host,
+.wash-label--bala-down .label-brand .inline-svg-host svg.label-brand-logo,
+.wash-label--bala-down .label-brand-logo {
+  height: var(--label-brand-logo-height-down);
+  max-height: var(--label-brand-logo-height-down);
+}
+
+.label-section--down-jacket .down-fill-grid {
+  margin-top: 0.35mm;
+}
+
+.down-fill-grid-title {
+  text-align: center;
+  font-size: 0.82em;
+  line-height: 1.1;
+  margin-bottom: 0.15mm;
+}
+
+.down-fill-grid-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.62em;
+  line-height: 1.05;
+}
+
+.down-fill-grid-cell {
+  border: 0.5px solid #333;
+  text-align: center;
+  padding: 0.08mm 0;
+  vertical-align: middle;
+  word-break: break-all;
+}
+
+.down-fill-grid--translated {
+  margin-top: 0.35mm;
+  margin-bottom: 0.2mm;
+}
+
+.down-jacket-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.down-jacket-lines .field input + input {
+  margin-top: 6px;
+}
+
+.down-fill-grid-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.down-fill-grid-editor-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.down-fill-grid-editor-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 480px;
+}
+
+.down-fill-grid-editor-table th,
+.down-fill-grid-editor-table td {
+  border: 1px solid var(--border);
+  padding: 6px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.down-fill-grid-editor-label {
+  font-size: 0.82rem;
+  color: var(--muted);
+  white-space: nowrap;
+  background: #fafbfc;
+}
+
+.down-fill-grid-editor-table input {
+  width: 100%;
+  min-width: 48px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.down-fill-grid-remove {
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0;
+}
+
+.down-fill-grid-remove:hover {
+  color: var(--primary);
+}
+
+.label-head-seam {
+  height: var(--label-head-seam);
+  width: 100%;
+}
+
+.label-fold-line {
+  border-top: 1px dashed #666;
+  margin: 0 0 1mm;
+}
+
+.label-brand {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  text-align: center;
+  margin-bottom: 0.8mm;
+  padding-top: 0.3mm;
+  overflow: visible;
+}
+
+/* 中文洗唛左侧多 2px 内边距：Logo 区拉满对称内容宽再居中 */
+.wash-label--source .label-brand {
+  box-sizing: border-box;
+  width: calc(100% + 2px);
+  margin-left: -2px;
+}
+
+.label-brand-logo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  margin: 0 auto;
+}
+
+.label-brand .inline-svg-host,
+.brand-logo-preview .inline-svg-host {
+  display: block;
+  width: var(--label-brand-logo-width);
+  height: var(--label-brand-logo-height);
+  margin: 0 auto;
+  overflow: visible;
+}
+
+.label-brand .inline-svg-host svg.label-brand-logo,
+.brand-logo-preview .inline-svg-host svg.label-brand-logo {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.brand-logo-preview {
+  padding: 12px;
+  background: #fafbfc;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: var(--label-width);
+  max-width: var(--label-width);
+  box-sizing: content-box;
+}
+
+.brand-logo-preview .label-head-seam {
+  height: 32px;
+  background: repeating-linear-gradient(
+    135deg,
+    transparent,
+    transparent 4px,
+    #f0f0f0 4px,
+    #f0f0f0 5px
+  );
+}
+
+.brand-logo-preview .label-fold-line {
+  margin-bottom: 8px;
+}
+
+.label-section {
+  margin-bottom: 0.6mm;
+}
+
+/* 成分与洗涤说明之间空一行 */
+.wash-label--source .label-section--composition {
+  margin-bottom: 0;
+}
+
+.wash-label--source .label-section--composition + .label-section--care {
+  margin-top: auto;
+}
+
+/* 成分与洗涤说明之间至少空一行 */
+.wash-label--balabala.wash-label--source .label-composition-care-spacer {
+  flex: 1 1 0;
+  min-height: 1em;
+}
+
+.wash-label--balabala.wash-label--translated .label-composition-care-spacer {
+  flex: 0 0 1em;
+  min-height: 1em;
+}
+
+.wash-label--balabala.wash-label--source .label-section--care,
+.wash-label--balabala.wash-label--source .label-section--composition + .label-section--care {
+  margin-top: 0;
+}
+
+/* 翻译区：阿语成分块底边线即分隔，洗涤说明前不再加第三条实线（仅巴拉） */
+.wash-label--balabala.wash-label--translated .label-section--care {
+  margin-top: 0;
+}
+
+.wash-label--translated .label-divider--solid:last-of-type {
+  margin-top: 1em;
+  margin-bottom: 0.35mm;
+}
+
+/* 中文洗涤区：标题 → 图标 → 干洗说明 → 洗涤建议 */
+.label-section--care {
+  display: flex;
+  flex-direction: column;
+}
+
+.label-section--care .label-source-title {
+  order: 0;
+}
+
+.label-section--care .care-symbols {
+  order: 1;
+}
+
+.label-section--care .label-source-emphasis {
+  order: 2;
+}
+
+.label-section--care .label-source-advice {
+  order: 3;
+}
+
+.label-section--care-mini .label-source-advice-lines {
+  order: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.label-section--care-mini .label-source-care-footer {
+  order: 4;
+}
+
+.composition-block {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 0;
+  align-items: start;
+  margin-bottom: 0.15mm;
+}
+
+.composition-line {
+  display: contents;
+}
+
+.composition-block .part-label {
+  grid-column: 1;
+  white-space: nowrap;
+}
+
+.composition-block .composition-token {
+  grid-column: 2;
+  min-width: 0;
+}
+
+.composition-block--inline {
+  line-height: 1.14;
+}
+
+.composition-inline-text {
+  word-break: break-word;
+}
+
+.label-divider {
+  border-top: 1px dashed #666;
+  margin: 0.6mm 0;
+}
+
+.label-divider--solid {
+  border-top: 1px solid #333;
+  margin: 0.5mm 0;
+}
+
+.wash-label .care-symbols {
+  justify-content: space-evenly;
+  gap: 0;
+}
+
+.care-symbols {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--label-care-symbol-gap);
+  width: 100%;
+  margin: 0.35mm 0;
+}
+
+.care-symbols--sm .care-symbol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wash-label--translated {
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.label-footer {
+  text-align: center;
+}
+
+.footer-made-in {
+  font-size: 1em;
+}
+
+.product-codes {
+  margin-top: 0.3mm;
+  line-height: 1.1;
+}
+
+.wash-label--translated .lang-block + .lang-block {
+  margin-top: 0.35mm;
+}
+
+.label-box-footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0.5mm 0;
+  overflow: hidden;
+}
+
+.label-box-footer__dry-clean {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.box-cell-line.rtl {
+  direction: rtl;
+}
+
+.care-advice-multilang > div + div {
+  margin-top: 0.25mm;
+}
+
+.rtl {
+  direction: rtl;
+  text-align: right;
+}
+
+@media (max-width: 1100px) {
+  .workspace-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    min-width: 0;
+  }
+
+  .workspace-col-head:nth-child(2),
+  .workspace-col-head:nth-child(3) {
+    display: none;
+  }
+
+  .workspace-editor,
+  .workspace-preview--source,
+  .workspace-preview--translated {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .workspace-preview--source::before {
+    content: '中文预览（25mm）';
+  }
+
+  .workspace-preview--translated::before {
+    content: '翻译出稿（25mm）';
+  }
+
+  .workspace-preview {
+    justify-content: flex-start;
+  }
+
+  .workspace-preview::before {
+    display: block;
+    text-align: center;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .app-header {
+    flex-direction: column;
+  }
+
+  .language-selector,
+  .export-toolbar,
+  .dictionary-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .language-options {
+    justify-content: flex-start;
+  }
+
+  .dictionary-actions,
+  .export-actions,
+  .language-actions {
+    flex-wrap: wrap;
+  }
+}
+
+@media print {
+  .app-header,
+  .dictionary-bar,
+  .language-selector,
+  .export-toolbar,
+  .workspace-editor,
+  .workspace-col-head,
+  .scale-control {
+    display: none !important;
+  }
+
+  .label-workspace {
+    border: none;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .workspace-grid {
+    grid-template-columns: auto auto;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .workspace-preview {
+    grid-column: auto !important;
+  }
+
+  .preview-scale-inner {
+    transform: none !important;
+    position: static !important;
+  }
+
+  .preview-scale-slot {
+    width: auto !important;
+    height: auto !important;
+  }
+}

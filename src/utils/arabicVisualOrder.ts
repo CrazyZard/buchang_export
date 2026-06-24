@@ -15,7 +15,7 @@ export function toArabicVisualString(logical: string): string {
 
 /**
  * 可编辑 PDF：仅 bidi 重排，保留基础阿拉伯字母（不换成呈现形）。
- * Illustrator 会自行连字整形；若再叠 direction=rtl 会二次反序。
+ * 可编辑 PDF 导出已改为逻辑序 + 右锚定位；此函数仍供转曲管线 toArabicVisualString 使用。
  */
 export function toArabicVisualBaseString(logical: string): string {
   const embeddingLevels = bidi.getEmbeddingLevels(logical, 'rtl')

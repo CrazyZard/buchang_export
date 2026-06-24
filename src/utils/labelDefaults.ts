@@ -46,6 +46,43 @@ export function createDefaultDownFillGrid(): DownFillGrid {
   }
 }
 
+/** 森马羽绒默认充绒量表格（7列，尺码含多行） */
+export function createSenmaDownFillGrid(): DownFillGrid {
+  return {
+    title: '',
+    columns: [
+      createDownFillColumn(
+        'CN:XS\n150/76A\nEUR:XXS\nUS:XXS',
+        '99.7',
+      ),
+      createDownFillColumn(
+        'CN:S\n155/80A\nEUR:XS\nUS:XS',
+        '105',
+      ),
+      createDownFillColumn(
+        'CN:M\n160/84A\nEUR:S\nUS:S',
+        '110',
+      ),
+      createDownFillColumn(
+        'CN:L\n165/88A\nEUR:M\nUS:M',
+        '118',
+      ),
+      createDownFillColumn(
+        'CN:XL\n170/92A\nEUR:L\nUS:L',
+        '126',
+      ),
+      createDownFillColumn(
+        'CN:XXL\n175/96A\nEUR:XL\nUS:XL',
+        '135',
+      ),
+      createDownFillColumn(
+        'CN:XXXL\n180/100A\nEUR:XXL\nUS:XXL',
+        '145',
+      ),
+    ],
+  }
+}
+
 /** 巴拉模板默认数据（25×54mm 标准样稿） */
 export function createBalabalaLabelData(): LabelData {
   return {
@@ -109,6 +146,102 @@ export function createBalaDownLabelData(): LabelData {
   }
 }
 
+/** 森马常规模板默认数据（25×90mm） */
+export function createSenmaRegularLabelData(): LabelData {
+  return {
+    composition: {
+      fabric: [],
+      ribbing: [],
+      lining: [],
+      filling: [],
+    },
+    dryCleanNote: '',
+    careAdvice:
+      '本商品建议单独洗涤，如有轻微褪色属正常现象，为保持衣服色泽，衣服不宜久浸。',
+    madeIn: '中国制造',
+    productCode1: '',
+    productCode2: '',
+    careSymbols: ['handWash', 'doNotBleach', 'lineDryingInShade', 'doNotIron', 'doNotDryClean'],
+  }
+}
+
+/** 森马羽绒模板默认数据（32×120mm） */
+export function createSenmaDownLabelData(): LabelData {
+  return {
+    composition: {
+      fabric: [],
+      ribbing: [],
+      lining: [],
+      filling: [],
+    },
+    downJacket: {
+      facingLines: ['', '', ''],
+      liningLine: '',
+      stuffingLines: ['', '', ''],
+      fillGrid: { title: '充绒量：(单位：克)', columns: [] },
+    },
+    dryCleanNote: '',
+    careAdvice:
+      '本商品建议单独洗涤，如有轻微褪色属正常现象，为保持衣服色泽，衣服不宜久浸。',
+    madeIn: '中国制造',
+    productCode1: '',
+    productCode2: '',
+    careSymbols: ['handWash', 'doNotBleach', 'lineDryingInShade', 'doNotIron', 'doNotDryClean'],
+  }
+}
+
+/** 青蛙模板默认数据（25×54mm） */
+export function createFrogLabelData(): LabelData {
+  return {
+    composition: {
+      fabric: [],
+      ribbing: [],
+      lining: [],
+      filling: [],
+    },
+    dryCleanNote: '不可干洗',
+    careAdvice:
+      '不可干洗，反底轻柔手洗，本商品建议深色易褪色的请单独洗涤，如有轻微褪色属正常现象，为保持产品色泽，产品不宜久浸，少量起球属正常现象请小心维护。',
+    madeIn: '中国制造',
+    productCode1: '102605',
+    productCode2: 'FFP33E4065',
+    careSymbols: ['handWash', 'doNotBleach', 'dripFlatDrying', 'doNotIron', 'doNotDryClean'],
+  }
+}
+
+/** 青蛙羽绒模板默认数据（32×120mm） */
+export function createFrogDownLabelData(): LabelData {
+  return {
+    composition: {
+      fabric: [],
+      ribbing: [],
+      lining: [],
+      filling: [],
+    },
+    downJacket: {
+      facingLines: ['', '', ''],
+      liningLine: '',
+      stuffingLines: ['', ''],
+      fillGrid: { title: '充绒量：(单位：克)', columns: [] },
+    },
+    dryCleanNote: '不可干洗',
+    careAdvice:
+      '不可干洗，反底轻柔手洗，本商品建议深色易褪色的请单独洗涤，如有轻微褪色属正常现象，为保持产品色泽，产品不宜久浸，少量起球属正常现象请小心维护。',
+    madeIn: '中国制造',
+    productCode1: '102556',
+    productCode2: 'FFP44F6181',
+    careSymbols: ['handWash', 'doNotBleach', 'dripFlatDrying', 'doNotIron', 'doNotDryClean'],
+  }
+}
+
+export const frogCareAdviceTitleEn = 'Washing maintenance instructions'
+
+/** 青蛙模板：英文翻译预览正文 */
+export const frogCareAdviceBodyEn =
+  'Do not dry clean, Wash inside out gently by hand. Dark color easily faded, please wash separately, Slight color fading is normal, To keep product color, do not soak for a long time. Slight pilling is normal, please take care.'
+
 export const defaultLabelData: LabelData = createBalabalaLabelData()
 
 export const defaultSelectedLanguages = ['英文', '俄文', '阿语译文']
+
+export const frogDefaultLanguages = ['英文']

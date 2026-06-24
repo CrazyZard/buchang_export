@@ -1,7 +1,7 @@
 import { useRef, useState, type RefObject } from 'react'
 import type { Dictionary, LabelData } from '../types'
 import type { TemplateId } from '../templates'
-import { exportLabelsPdf, resolvePdfFilename, type ExportPdfTextMode } from '../utils/exportPdf'
+import { exportLabelsPdf, resolvePdfFilename } from '../utils/exportPdf'
 import {
   createProjectSnapshot,
   exportProjectSnapshot,
@@ -37,7 +37,7 @@ export function ExportToolbar({
   const importRef = useRef<HTMLInputElement>(null)
   const [exporting, setExporting] = useState(false)
 
-  const handleExportPdf = async (textMode: ExportPdfTextMode = 'outline') => {
+  const handleExportPdf = async () => {
     if (!sourceExportRef.current || !translatedExportRef.current) return
     if (selectedLanguages.length === 0) {
       alert('请至少选择一种出稿语言')
@@ -49,8 +49,7 @@ export function ExportToolbar({
       await exportLabelsPdf(
         sourceExportRef.current,
         translatedExportRef.current,
-        resolvePdfFilename(batchCount, textMode),
-        { textMode },
+        resolvePdfFilename(batchCount),
       )
     } catch (err) {
       const message =
@@ -99,7 +98,7 @@ export function ExportToolbar({
         <span className="dict-meta">
           PDF 矢量出稿，左中文右翻译、25mm 宽
           {batchCount > 1 ? `；批量共 ${batchCount} 条合并为一个 PDF` : ''}
-          ；「AI 可编辑 PDF」保留文字，成分区与洗涤建议各合并为一个文本框（换行排版）
+          ；保留可编辑文字，成分区与洗涤建议各合并为一个文本框（换行排版）
           ；项目可导出/导入 Excel（亦兼容 JSON）
         </span>
       </div>
@@ -120,10 +119,10 @@ export function ExportToolbar({
         <button
           type="button"
           className="btn-primary"
-          onClick={() => void handleExportPdf('live')}
+          onClick={() => void handleExportPdf()}
           disabled={exporting || selectedLanguages.length === 0}
         >
-          {exporting ? '导出中…' : 'AI 可编辑 PDF'}
+          {exporting ? '导出中…' : '导出 PDF'}
         </button>
         <input
           ref={importRef}

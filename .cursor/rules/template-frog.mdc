@@ -1,0 +1,34 @@
+# 青蛙模板（frog）
+
+## 尺寸
+- 25 × 54mm
+- 缝头 8mm
+
+## 字体
+- 中文：微软雅黑（Microsoft YaHei），全文 5pt（不自动缩小）
+- 翻译：微软雅黑（Microsoft YaHei），全文 5pt（不自动缩小）
+- 成分含量 / Composition content 标题：5.2pt（CSS `:first-child` 放大）
+- 洗涤建议：微软雅黑（Microsoft YaHei），全文 3.1pt（不自动缩小）
+## 语言
+- 仅英文翻译（`frogDefaultLanguages = ['英文']`）
+
+## Logo
+- `frog.svg`（src/assets/），无备选
+
+## 成分
+- 标准成分模式，部位：面料/罗纹/里料/填充物
+- 粘贴/导入格式："材料名 数字"（如 "聚酯纤维 30.0"），解析后自动转为 "数字% 材料名"
+- Excel 批量导入列：工厂代码 / 款号 / 中文资料 / 洗涤说明
+- 中文成分标题："成分含量"
+- 翻译成分标题："Composition content:"
+
+## 洗涤说明
+- 中文标题："洗涤维护方法"（非"洗涤说明"）
+- 默认洗涤建议（pre-line 断行）
+- 翻译侧：完整英文文本块 + 洗护图标（不走 SVG 图形）
+- 翻译侧英文全文：`frogCareAdviceEn` 常量
+
+## 翻译
+- 字典：balabala.xlsx
+- 阿语成分块：上下黑色实线（arabicBlockBorder: 'solid'）
+- 翻译成分排版：auto

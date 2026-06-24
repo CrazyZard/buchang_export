@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { TemplateProvider } from '../context/TemplateContext'
+import { SelectedLogoProvider } from '../context/SelectedLogoContext'
 import { ExportToolbar } from '../components/ExportToolbar'
 import { LabelWorkspace } from '../components/LabelWorkspace'
 import { LanguageSelector } from '../components/LanguageSelector'
@@ -7,8 +8,8 @@ import { WashLabelPreview } from '../components/WashLabelPreview'
 import type { BatchLabelItem, CompositionPart, Dictionary, LabelData } from '../types'
 import { getTemplate, type TemplateId } from '../templates'
 import { defaultDictionary } from '../utils/defaultDictionary'
-import { defaultSelectedLanguages, normalizeComposition } from '../utils/labelDefaults'
-import { applyCompositionPaste } from '../utils/parseCompositionPaste'
+import { defaultSelectedLanguages, frogDefaultLanguages, normalizeComposition } from '../utils/labelDefaults'
+import { applyCompositionPaste, applyDownJacketPaste, applyFrogCompositionPaste } from '../utils/parseCompositionPaste'
 import { loadDictionaryFromUrl, resolveOutputLanguages } from '../utils/dictionary'
 
 interface EditorPageProps {
@@ -30,12 +31,13 @@ export function EditorPage({ templateId, onBack }: EditorPageProps) {
   useEffect(() => {
     setLabelData(template.createDefaultLabelData())
     setBatchItems([])
-    setSelectedLanguages(defaultSelectedLanguages)
+    setSelectedLanguages(template.id === 'frog' ? frogDefaultLanguages : defaultSelectedLanguages)
 
     loadDictionaryFromUrl(template.dictionaryUrl)
       .then((parsed) => {
         setDictionary(parsed)
-        setSelectedLanguages(parsed.languages)
+        // frog 模板只展示英文
+        setSelectedLanguages(template.id === 'frog' ? frogDefaultLanguages : parsed.languages)
       })
       .catch((err) => {
         console.warn(err)
@@ -77,7 +79,15 @@ export function EditorPage({ templateId, onBack }: EditorPageProps) {
   }
 
   const handleCompositionPaste = (text: string) => {
-    setLabelData((prev) => applyCompositionPaste(prev, text))
+    setLabelData((prev) => {
+      if (template.compositionMode === 'down-jacket') {
+        return applyDownJacketPaste(prev, text)
+      }
+      if (template.id === 'frog') {
+        return applyFrogCompositionPaste(prev, text)
+      }
+      return applyCompositionPaste(prev, text)
+    })
   }
 
   const handleBatchImport = (items: BatchLabelItem[]) => {
@@ -95,6 +105,16 @@ export function EditorPage({ templateId, onBack }: EditorPageProps) {
 
   const handleBatchClear = () => {
     setBatchItems([])
+  }
+
+  const handleCompositionClear = () => {
+    const defaults = template.createDefaultLabelData()
+    setLabelData((prev) => {
+      if (template.compositionMode === 'down-jacket') {
+        return { ...prev, downJacket: defaults.downJacket }
+      }
+      return { ...prev, composition: defaults.composition }
+    })
   }
 
   const handleProjectImport = (payload: {
@@ -116,7 +136,8 @@ export function EditorPage({ templateId, onBack }: EditorPageProps) {
 
   return (
     <TemplateProvider template={template}>
-      <div className="app">
+      <SelectedLogoProvider key={templateId}>
+        <div className="app">
         <header className="app-header">
           <div>
             <button type="button" className="back-link" onClick={onBack}>
@@ -171,6 +192,7 @@ export function EditorPage({ templateId, onBack }: EditorPageProps) {
           onUpdateField={updateField}
           onUpdateComposition={updateComposition}
           onApplyCompositionPaste={handleCompositionPaste}
+          onCompositionClear={handleCompositionClear}
           onBatchImport={handleBatchImport}
           onBatchClear={handleBatchClear}
         />
@@ -220,6 +242,7 @@ export function EditorPage({ templateId, onBack }: EditorPageProps) {
           </div>
         </div>
       </div>
+      </SelectedLogoProvider>
     </TemplateProvider>
   )
 }

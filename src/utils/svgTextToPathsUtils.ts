@@ -1,14 +1,15 @@
 import opentype from 'opentype.js'
-import { ARABIC_RENDER_OPTIONS, isArabicExportText, splitRtlWeakTrailingPunct } from './arabicTextExport'
+import { ARABIC_RENDER_OPTIONS, coalesceDigitPercentRuns, isArabicExportText, splitRtlWeakTrailingPunct } from './arabicTextExport'
+import { reshapeArabic } from './arabicShaping'
 import {
   isChineseCompositionDigitText,
 } from './exportTextBlockKind'
-import { toArabicVisualString } from './arabicVisualOrder'
 import {
   ARABIC_RE,
   CYRILLIC_RE,
   splitTextByFontRole,
   textContainsCjkOrPunct,
+  toFzPercentGlyph,
 } from './textScriptDetect'
 
 const BASE_URL = import.meta.env?.BASE_URL ?? '/'
@@ -119,9 +120,9 @@ export async function preloadExportFonts(): Promise<{ zh: boolean; arabic: boole
   return { zh: Boolean(zh), arabic: Boolean(arabic) }
 }
 
-export function pickFontRole(fontFamily: string, text: string): FontRole {
+export function pickFontRole(fontFamily: string | null | undefined, text: string): FontRole {
   const trimmed = text.trim()
-  const family = fontFamily.toLowerCase()
+  const family = (fontFamily ?? '').toLowerCase()
   const arabicFamily = family.includes('arial') || family.includes('arabic')
 
   if (ARABIC_RE.test(text)) return 'arabic'
@@ -781,11 +782,12 @@ export async function renderRtlTspansAtCapturedPositions(
           const runFont = await resolveFontForRole(run.role)
           if (!runFont) continue
           const options = renderOptionsForRole(run.role)
+          const content = run.role === 'zh' ? toFzPercentGlyph(run.content) : run.content
           appendShapedTextPath(
             ownerDocument,
             group,
             runFont,
-            run.content,
+            content,
             cursorX,
             y,
             fontSize,
@@ -793,7 +795,7 @@ export async function renderRtlTspansAtCapturedPositions(
             options,
             run.role === 'arabic',
           )
-          cursorX += measureAdvance(runFont, run.content, fontSize, options)
+          cursorX += measureAdvance(runFont, content, fontSize, options)
         }
         width = totalWidth
       }
@@ -828,11 +830,12 @@ export async function appendSplitTextPaths(
     if (!font) continue
 
     const options = renderOptionsForRole(run.role)
+    const content = run.role === 'zh' ? toFzPercentGlyph(run.content) : run.content
     appendShapedTextPath(
       ownerDocument,
       group,
       font,
-      run.content,
+      content,
       cursorX,
       y,
       fontSize,
@@ -840,7 +843,7 @@ export async function appendSplitTextPaths(
       options,
       rtl && run.role === 'arabic',
     )
-    const advance = measureAdvance(font, run.content, fontSize, options)
+    const advance = measureAdvance(font, content, fontSize, options)
     cursorX += advance
     renderedWidth += advance
   }
@@ -920,34 +923,210 @@ interface TextFragmentRun {
   width: number
 }
 
-/** 阿语视觉串按字符分字体：数字→GO，% →FZ，阿拉伯字母/标点/空格→ARIAL */
-function arabicVisualCharRole(ch: string): FontRole {
-  if (ch === '%' || ch === '％' || ch === '\u066a' || ch === '\u202a') return 'zh' // % 用 FZ
-  if (/[0-9.\u0660-\u0669]/.test(ch)) return 'latin' // 数字用 GO
-  return 'arabic' // 阿拉伯字母/呈现形/标点/空格 → ARIAL
+interface ArabicPathRun {
+  kind: 'single'
+  content: string
+  role: FontRole
+  font: opentype.Font
+  options?: object
+  width: number
 }
 
-function splitArabicVisualRuns(visual: string): Array<{ text: string; role: FontRole }> {
-  const runs: Array<{ text: string; role: FontRole }> = []
-  let current = ''
-  let currentRole: FontRole | null = null
-  for (const ch of visual) {
-    const role = arabicVisualCharRole(ch)
-    if (currentRole === role) {
-      current += ch
-    } else {
-      if (current && currentRole) runs.push({ text: current, role: currentRole })
-      current = ch
-      currentRole = role
+interface ArabicPathDigitPercent {
+  kind: 'digit-percent'
+  digits: string
+  percent: string
+  latinFont: opentype.Font
+  zhFont: opentype.Font
+  width: number
+}
+
+type ArabicPathPlacement = ArabicPathRun | ArabicPathDigitPercent
+
+async function measureArabicPathPlacements(
+  logical: string,
+  fontSize: number,
+): Promise<{ measured: ArabicPathPlacement[]; naturalTotal: number }> {
+  // 与预览端 appendArabicLiveTspans 一致：逻辑序分字体，勿用 bidi 视觉序（反转会破坏词与数字的边界）
+  const reshaped = reshapeArabic(logical)
+  const segments = coalesceDigitPercentRuns(splitTextByFontRole(reshaped, 'arabic'))
+  const measured: ArabicPathPlacement[] = []
+  let naturalTotal = 0
+
+  for (const segment of segments) {
+    if (segment.kind === 'digit-percent') {
+      const latinFont = (await resolveFontForRole('latin')) ?? (await resolveFontForRole('arabic'))
+      const zhFont = (await resolveFontForRole('zh')) ?? latinFont
+      if (!latinFont || !zhFont) continue
+      const percentGlyph = toFzPercentGlyph(segment.percent)
+      const width =
+        measureAdvance(latinFont, segment.digits, fontSize) +
+        measureAdvance(zhFont, percentGlyph, fontSize)
+      measured.push({
+        kind: 'digit-percent',
+        digits: segment.digits,
+        percent: percentGlyph,
+        latinFont,
+        zhFont,
+        width,
+      })
+      naturalTotal += width
+      continue
     }
+
+    const glyphText = prepareArabicPathRunText(segment.content, segment.role)
+    const font = (await resolveFontForRole(segment.role)) ?? (await resolveFontForRole('arabic'))
+    if (!font) continue
+    const options = renderOptionsForRole(segment.role)
+    const width = measureAdvance(font, glyphText, fontSize, options)
+    measured.push({
+      kind: 'single',
+      content: glyphText,
+      role: segment.role,
+      font,
+      options,
+      width,
+    })
+    naturalTotal += width
   }
-  if (current && currentRole) runs.push({ text: current, role: currentRole })
-  return runs
+
+  return { measured, naturalTotal }
+}
+
+function drawArabicPathPlacement(
+  ownerDocument: Document,
+  group: SVGGElement,
+  run: ArabicPathPlacement,
+  runStart: number,
+  y: number,
+  fontSize: number,
+  fill: string,
+  scaleX: number,
+): void {
+  if (run.kind === 'digit-percent') {
+    let innerX = runStart
+    const digitAdvance = measureAdvance(run.latinFont, run.digits, fontSize) * scaleX
+    appendScaledTextPath(
+      ownerDocument,
+      group,
+      run.latinFont,
+      run.digits,
+      innerX,
+      y,
+      fontSize,
+      fill,
+      scaleX,
+    )
+    innerX += digitAdvance
+    appendScaledTextPath(
+      ownerDocument,
+      group,
+      run.zhFont,
+      run.percent,
+      innerX,
+      y,
+      fontSize,
+      fill,
+      scaleX,
+    )
+    return
+  }
+
+  if (run.role === 'arabic' && run.options) {
+    const { core, trail } = splitRtlWeakTrailingPunct(run.content)
+    let innerX = runStart
+    if (trail) {
+      appendScaledTextPath(
+        ownerDocument,
+        group,
+        run.font,
+        trail,
+        innerX,
+        y,
+        fontSize,
+        fill,
+        scaleX,
+        run.options,
+      )
+      innerX += measureAdvance(run.font, trail, fontSize, run.options) * scaleX
+    }
+    if (core) {
+      appendScaledTextPath(
+        ownerDocument,
+        group,
+        run.font,
+        core,
+        innerX,
+        y,
+        fontSize,
+        fill,
+        scaleX,
+        run.options,
+      )
+    }
+    return
+  }
+
+  appendScaledTextPath(
+    ownerDocument,
+    group,
+    run.font,
+    run.content,
+    runStart,
+    y,
+    fontSize,
+    fill,
+    scaleX,
+    run.options,
+  )
+}
+
+function prepareArabicPathRunText(content: string, role: FontRole): string {
+  if (role === 'zh') return toFzPercentGlyph(content)
+  if (role === 'arabic') return reshapeArabic(mirrorArabicParensForPath(content))
+  return content
+}
+
+/** 转曲模式下阿语括号镜像：bidi 浏览器自动翻转 (↔) 和 （↔），转曲 path 须手动交换 */
+function mirrorArabicParensForPath(text: string): string {
+  return text.replace(/[()（）]/g, (ch) => {
+    if (ch === '(') return ')'
+    if (ch === ')') return '('
+    if (ch === '（') return '）'
+    return '（'
+  })
+}
+
+function appendScaledTextPath(
+  ownerDocument: Document,
+  group: SVGGElement,
+  font: opentype.Font,
+  text: string,
+  x: number,
+  y: number,
+  fontSize: number,
+  fill: string,
+  scaleX: number,
+  renderOptions?: object,
+): number {
+  if (!text) return 0
+  const shapingFont = font as ShapingFont
+  const path = renderOptions
+    ? shapingFont.getPath(text, 0, y, fontSize, renderOptions)
+    : font.getPath(text, 0, y, fontSize)
+  const runGroup = ownerDocument.createElementNS('http://www.w3.org/2000/svg', 'g')
+  runGroup.setAttribute('transform', `translate(${x},0) scale(${scaleX},1)`)
+  const pathEl = ownerDocument.createElementNS('http://www.w3.org/2000/svg', 'path')
+  pathEl.setAttribute('d', path.toPathData(2))
+  pathEl.setAttribute('fill', fill)
+  runGroup.appendChild(pathEl)
+  group.appendChild(runGroup)
+  return measureAdvance(font, text, fontSize, renderOptions) * scaleX
 }
 
 /**
- * 阿拉伯整段：整形 + bidi 重排为视觉序，再按字符分字体（数字 GO / % FZ / 阿拉伯 ARIAL）
- * 逐段矢量转曲，并按 dom-to-svg 量得的 [leftX, rightX] 横向缩放，精确贴合预览宽度。
+ * 阿语混排转曲：逻辑序分字体（与预览 / live 导出一致），从右缘向左排布；
+ * 阿拉伯段 reshape 呈现形。勿用 bidi 视觉序（混排 %/数字时与浏览器顺序不一致）。
  */
 export async function appendArabicVisualPath(
   ownerDocument: Document,
@@ -959,39 +1138,27 @@ export async function appendArabicVisualPath(
   fontSize: number,
   fill: string,
 ): Promise<number> {
-  const visual = toArabicVisualString(logical)
-  if (!visual) return 0
+  if (!logical) return 0
 
-  const runs = splitArabicVisualRuns(visual)
-  const measured: Array<{ text: string; font: opentype.Font; width: number }> = []
-  let naturalTotal = 0
-  for (const run of runs) {
-    const font = (await resolveFontForRole(run.role)) ?? (await resolveFontForRole('arabic'))
-    if (!font) continue
-    const width = measureAdvance(font, run.text, fontSize)
-    measured.push({ text: run.text, font, width })
-    naturalTotal += width
-  }
-  if (naturalTotal <= 0) return 0
+  const { measured, naturalTotal } = await measureArabicPathPlacements(logical, fontSize)
+  if (naturalTotal <= 0 || measured.length === 0) return 0
 
   const targetWidth = rightX > leftX ? rightX - leftX : naturalTotal
-  const scaleX = targetWidth / naturalTotal
+  const scaleX = naturalTotal > targetWidth ? targetWidth / naturalTotal : 1
+  const scaledTotal = naturalTotal * scaleX
 
-  let cursorX = leftX
-  for (const run of measured) {
-    const path = run.font.getPath(run.text, 0, y, fontSize)
-    // 用 SVG transform 缩放/平移，绝不改写 path.commands（共享 opentype glyph 缓存）
-    const runGroup = ownerDocument.createElementNS('http://www.w3.org/2000/svg', 'g')
-    runGroup.setAttribute('transform', `translate(${cursorX},0) scale(${scaleX},1)`)
-    const pathEl = ownerDocument.createElementNS('http://www.w3.org/2000/svg', 'path')
-    pathEl.setAttribute('d', path.toPathData(2))
-    pathEl.setAttribute('fill', fill)
-    runGroup.appendChild(pathEl)
-    group.appendChild(runGroup)
-    cursorX += run.width * scaleX
+  // 逻辑序 segments：首个 segment 应排在右缘（RTL 阅读先看到）
+  // 勿倒序（预览端浏览器 bidi 会纠正，但 path 坐标没有 bidi）
+  let cursorX = rightX
+  for (let i = 0; i < measured.length; i++) {
+    const run = measured[i]
+    const runWidth = run.width * scaleX
+    const runStart = cursorX - runWidth
+    drawArabicPathPlacement(ownerDocument, group, run, runStart, y, fontSize, fill, scaleX)
+    cursorX = runStart
   }
 
-  return targetWidth
+  return scaledTotal
 }
 
 export async function appendRtlMixedTextPaths(

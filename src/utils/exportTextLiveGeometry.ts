@@ -15,6 +15,22 @@ const LIVE_DOMINANT_BASELINE = 'text-after-edge'
 /** 25mm 洗唛宽约 94px（dom-to-svg 坐标），data-ex-right 缺失时用于自动折行 */
 export const LIVE_LABEL_TEXT_WIDTH_PX = 94
 
+/** .wash-label 右边距 1mm（padding: 0 1mm 1.2mm），避免阿语导出贴边 */
+export const LIVE_LABEL_RIGHT_PADDING_PX = LIVE_LABEL_TEXT_WIDTH_PX / 25
+
+/** 款号/工厂代码：在洗唛宽度内水平居中 */
+export function resolveCenteredLineStartX(
+  leftX: number,
+  rightX: number,
+  lineWidth: number,
+): number {
+  const left = Number.isFinite(leftX) ? leftX : 0
+  let right = Number.isFinite(rightX) && rightX > left ? rightX : left + LIVE_LABEL_TEXT_WIDTH_PX
+  const boxWidth = right - left
+  if (lineWidth >= boxWidth || lineWidth <= 0) return left
+  return left + (boxWidth - lineWidth) / 2
+}
+
 export function applyLiveDominantBaseline(textEl: SVGTextElement): void {
   textEl.setAttribute('dominant-baseline', LIVE_DOMINANT_BASELINE)
 }
@@ -118,13 +134,27 @@ export async function measureMixedWidth(
   return text.length * charWidth
 }
 
-/** 按洗唛可用宽度折行（洗涤建议等长段落） */
+/** 成分区/洗涤建议自动折行宽度：固定 25mm，勿用溢出内容的实测右缘 */
+export function resolveLiveWrapMaxWidth(
+  leftX: number,
+  rightX: number,
+  options?: { isPlainComposition?: boolean; isCareAdvice?: boolean },
+): number {
+  if (options?.isPlainComposition || options?.isCareAdvice) {
+    return LIVE_LABEL_TEXT_WIDTH_PX
+  }
+  const captured = rightX > leftX ? rightX - leftX : 0
+  if (captured <= 0) return LIVE_LABEL_TEXT_WIDTH_PX
+  return Math.min(captured, LIVE_LABEL_TEXT_WIDTH_PX)
+}
+
+/** 按洗唛可用宽度折行（洗涤建议 / 成分脚注等长段落） */
 function chunkTextForWrap(text: string): string[] {
   const chunks: string[] = []
   let buf = ''
   for (const ch of text) {
     buf += ch
-    if (/[\s，、；;：:。.!?！？]/.test(ch)) {
+    if (/[\s，、；;：:。.!?！？/]/.test(ch)) {
       chunks.push(buf)
       buf = ''
     }

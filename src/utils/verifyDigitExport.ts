@@ -309,6 +309,136 @@ async function testArabicRtlPathsStayInView(): Promise<void> {
   assert(maxX <= right + 2, `阿语：右缘应≈${right}，实际 maxX=${maxX.toFixed(2)}`)
 }
 
+/** 回归：翻译区 composition-plain（composition-single）须走阿语 RTL 转曲，勿走 LTR 通用路径 */
+async function testArabicCompositionPlainPathsStayInView(): Promise<void> {
+  installWindowMock()
+  installFontFetchMock()
+
+  const svg = loadSvgFixture(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="95" height="120" viewBox="0 0 95 120">
+      <g class="live-export-single-text composition-plain" dir="rtl">
+        <text y="20" font-size="6" direction="rtl" fill="#000" data-ex-left="0" data-ex-right="94">
+          <tspan x="94" y="20" text-anchor="end">المكونات:</tspan>
+        </text>
+      </g>
+    </svg>
+  `)
+  await convertSvgTextToPaths(svg)
+  assert(countTexts(svg) === 0, '阿语 translation plain：转曲后不应残留 text')
+
+  let minX = Infinity
+  let maxX = -Infinity
+  for (const path of svg.querySelectorAll('path')) {
+    const { minX: pMin, maxX: pMax } = pathWorldXExtents(path)
+    minX = Math.min(minX, pMin)
+    maxX = Math.max(maxX, pMax)
+  }
+  assert(Number.isFinite(minX), '阿语 translation plain：应有 path')
+  assert(minX >= -2, `阿语 translation plain：左缘不应跑出画布 minX=${minX.toFixed(2)}`)
+  assert(maxX <= 96, `阿语 translation plain：右缘应贴 25mm maxX=${maxX.toFixed(2)}`)
+}
+
+/** 回归：压平后的多行阿语成分（与英文/俄文同管线）须逐行转曲且落在画布内 */
+async function testArabicCompositionPlainMultilinePaths(): Promise<void> {
+  installWindowMock()
+  installFontFetchMock()
+
+  const svg = loadSvgFixture(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="95" height="200" viewBox="0 0 95 200">
+      <g class="live-export-single-text composition-plain" dir="rtl">
+        <text y="20" font-size="6" direction="rtl" fill="#000" data-ex-left="0" data-ex-right="94">
+          <tspan x="94" y="20" text-anchor="end">المكونات:</tspan>
+          <tspan x="94" y="28" text-anchor="end">نسيج: 57.7%أكريليك</tspan>
+        </text>
+      </g>
+    </svg>
+  `)
+  await convertSvgTextToPaths(svg)
+  assert(countTexts(svg) === 0, '多行阿语成分：转曲后不应残留 text')
+  assert(svg.querySelectorAll('path').length > 0, '多行阿语成分：应有 path')
+
+  let minX = Infinity
+  let maxX = -Infinity
+  for (const path of svg.querySelectorAll('path')) {
+    const { minX: pMin, maxX: pMax } = pathWorldXExtents(path)
+    minX = Math.min(minX, pMin)
+    maxX = Math.max(maxX, pMax)
+  }
+  assert(minX >= -2, `多行阿语成分：左缘不应跑出画布 minX=${minX.toFixed(2)}`)
+  assert(maxX <= 96, `多行阿语成分：右缘应贴 25mm maxX=${maxX.toFixed(2)}`)
+}
+
+/** 回归：dom-to-svg 阿语 textLength=0 时几何应记 [0, 右锚x] */
+async function testArabicZeroTextLengthGeometry(): Promise<void> {
+  installWindowMock()
+  installFontFetchMock()
+
+  // dom-to-svg 阿语 textLength=0 时 data-ex-left/right 会同为右锚 x；转曲应仍落在 [0, 94]
+  const svg = loadSvgFixture(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="95" height="200" viewBox="0 0 95 200">
+      <g class="live-export-single-text composition-plain" dir="rtl">
+        <text direction="rtl" font-size="6" fill="#000">
+          <tspan x="73.51" y="20" textLength="0">المكونات:</tspan>
+        </text>
+      </g>
+    </svg>
+  `)
+
+  // 与 exportPdf.captureExportGeometry 相同逻辑（函数未导出，内联验证 bounds 修复）
+  const textEl = svg.querySelector('text') as unknown as SVGTextElement
+  textEl.setAttribute('data-ex-left', '0')
+  textEl.setAttribute('data-ex-right', '73.51')
+
+  const { resolveArabicLiveBoxBounds } = await import('./exportTextLiveUtils')
+  const bounds = resolveArabicLiveBoxBounds(textEl, 73.51, 73.51)
+  assert(bounds.leftX === 0, `textLength=0 阿语左缘应为 0: ${bounds.leftX}`)
+  assert(bounds.rightX === 94, `textLength=0 阿语右缘应贴 25mm: ${bounds.rightX}`)
+
+  await convertSvgTextToPaths(svg)
+  assert(svg.querySelectorAll('path').length > 0, 'textLength=0 阿语应有 path')
+
+  let maxX = -Infinity
+  for (const path of svg.querySelectorAll('path')) {
+    maxX = Math.max(maxX, pathWorldXExtents(path).maxX)
+  }
+  assert(maxX <= 96, `textLength=0 阿语 path 不应画出画布 maxX=${maxX.toFixed(2)}`)
+}
+
+/** 混排成分行：标签 النسيج 应在右、材质 البولي 应在左（逻辑序右排，勿 bidi 反序） */
+async function testArabicMixedLineLogicalOrder(): Promise<void> {
+  installWindowMock()
+  installFontFetchMock()
+
+  const line = 'النسيج:57.7% البولي أكريلونيتريل'
+  const svg = loadSvgFixture(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="95" height="80" viewBox="0 0 95 80">
+      <g class="live-export-single-text composition-plain" dir="rtl">
+        <text direction="rtl" font-size="6" fill="#000" data-ex-left="0" data-ex-right="94">
+          <tspan x="94" y="20" text-anchor="end">${line}</tspan>
+        </text>
+      </g>
+    </svg>
+  `)
+  await convertSvgTextToPaths(svg)
+
+  const pathCenters: number[] = []
+  for (const path of svg.querySelectorAll('path')) {
+    const { minX, maxX } = pathWorldXExtents(path)
+    if (Number.isFinite(minX) && Number.isFinite(maxX)) {
+      pathCenters.push((minX + maxX) / 2)
+    }
+  }
+  pathCenters.sort((a, b) => a - b)
+  assert(pathCenters.length >= 3, `混排阿语应有多个 path 段: ${pathCenters.length}`)
+  // 右端 path 群应整体偏右（标签侧），左端偏左（材质名）
+  const leftThird = pathCenters[Math.floor(pathCenters.length / 4)]
+  const rightThird = pathCenters[Math.floor((pathCenters.length * 3) / 4)]
+  assert(
+    rightThird > leftThird + 5,
+    `混排阿语右端应偏右: left=${leftThird.toFixed(1)} right=${rightThird.toFixed(1)}`,
+  )
+}
+
 /** 回归：阿语数字段转曲（带横向缩放）不得污染 GO 字形缓存，导致后续中文数字错位 */
 async function testZhCompositionDigitBBox(): Promise<void> {
   installWindowMock()
@@ -415,6 +545,10 @@ async function main(): Promise<void> {
   await testConvertLeavesNoOverlappingDigitPrefix()
   await testZhCompositionDigitBBox()
   await testArabicRtlPathsStayInView()
+  await testArabicCompositionPlainPathsStayInView()
+  await testArabicCompositionPlainMultilinePaths()
+  await testArabicZeroTextLengthGeometry()
+  await testArabicMixedLineLogicalOrder()
   await testArabicDoesNotPolluteLatinGlyphs()
   console.log('verify:digit-export 全部通过')
 }

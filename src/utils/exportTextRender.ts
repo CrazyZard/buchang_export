@@ -1,4 +1,21 @@
-import { classifyExportTextBlock } from './exportTextBlockKind'
+import { isArabicExportText } from './arabicTextExport'
+import {
+  classifyExportTextBlock,
+  isCareAdviceLiveNode,
+  isChineseCompositionDigitText,
+  isChineseCompositionPartLine,
+  isProductCodesSvgBlock,
+} from './exportTextBlockKind'
+import {
+  expandLiveDisplayLines,
+  extractLiveTextLines,
+  LIVE_LABEL_TEXT_WIDTH_PX,
+  measureMixedWidth,
+  readLiveLineYs,
+  resolveCenteredLineStartX,
+  resolveLiveWrapMaxWidth,
+} from './exportTextLiveGeometry'
+import { isArabicRtlExportContext, readTextStartX, resolveArabicLiveBoxBounds } from './exportTextLiveUtils'
 import type { FontRole } from './svgTextToPathsUtils'
 import {
   appendArabicVisualPath,
@@ -9,6 +26,7 @@ import {
   groupTspansByLine,
   isRealMultilineText,
   parseCoord,
+  parseLineHeight,
   renderLtrLinesUnified,
   resolveFontForRole,
   resolvePathY,
@@ -43,7 +61,7 @@ export async function renderTextRunsByBlock(
     case 'arabic-rtl':
       return renderArabicRtlBlock(ownerDocument, group, textEl, fontSize, fill, defaultRole)
     case 'composition-single':
-      return renderGenericLtrBlock(
+      return renderCompositionSingleBlock(
         ownerDocument,
         group,
         textEl,
@@ -244,13 +262,15 @@ async function renderArabicRtlBlock(
       if (!lineText) continue
       const rawY = line.y
       const y = resolvePathY(font, rawY, fontSize, usesAfterEdge)
-      const leftX = line.startX
+      const rawLeft = parseCoord(textEl.getAttribute('data-ex-left'), line.startX)
+      const rawRight = parseCoord(textEl.getAttribute('data-ex-right'), rawLeft)
+      const { leftX, rightX } = resolveArabicLiveBoxBounds(textEl, rawLeft, rawRight, line.startX)
       const width = await appendArabicVisualPath(
         ownerDocument,
         group,
         lineText,
         leftX,
-        leftX,
+        rightX,
         y,
         fontSize,
         fill,
@@ -265,12 +285,12 @@ async function renderArabicRtlBlock(
     parseCoord(tspans[0]?.getAttribute('y'), parseCoord(textEl.getAttribute('y')))
   const y = resolvePathY(font, rawY, fontSize, usesAfterEdge)
 
-  // 删 textLength 前捕获的左右缘；缺失时回退到 tspan x
-  const leftX = parseCoord(
+  const rawLeft = parseCoord(
     textEl.getAttribute('data-ex-left'),
     parseCoord(tspans[0]?.getAttribute('x'), parseCoord(textEl.getAttribute('x'))),
   )
-  const rightX = parseCoord(textEl.getAttribute('data-ex-right'), leftX)
+  const rawRight = parseCoord(textEl.getAttribute('data-ex-right'), rawLeft)
+  const { leftX, rightX } = resolveArabicLiveBoxBounds(textEl, rawLeft, rawRight)
 
   const width = await appendArabicVisualPath(
     ownerDocument,
@@ -285,6 +305,202 @@ async function renderArabicRtlBlock(
   return width > 0
 }
 
+/** 整块成分区 / 洗涤建议：阿语走 RTL 转曲，其余走 LTR（与 live 导出 renderCompositionSingleLive 一致） */
+function splitCompositionSingleLines(raw: string): string[] {
+  return raw
+    .split(/\r?\n/)
+    .map((line) => line.replace(/[ \t]+/g, ' ').replace(/\s+$/, ''))
+    .filter((line) => line.length > 0)
+}
+
+function isCompositionPlainSvgBlock(textEl: SVGTextElement): boolean {
+  return Boolean(textEl.closest('g.composition-plain, .composition-plain'))
+}
+
+const MATERIAL_TOKEN_RE = /^[\d.]+%/
+
+interface CompositionPlainLineLayout {
+  text: string
+  lineX: number
+}
+
+async function layoutCompositionPlainLines(
+  lines: string[],
+  leftX: number,
+  fontSize: number,
+  defaultRole: FontRole,
+): Promise<CompositionPlainLineLayout[]> {
+  let activeLabel = ''
+  let indentPx = 0
+  const result: CompositionPlainLineLayout[] = []
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    const headMatch = trimmed.match(/^(.+?)[:：]\s*(.*)$/)
+    if (headMatch && (MATERIAL_TOKEN_RE.test(headMatch[2]) || headMatch[2].length > 0)) {
+      const colon = trimmed.includes('：') ? '：' : ':'
+      activeLabel = `${headMatch[1]}${colon}`
+      indentPx = await measureMixedWidth(activeLabel, fontSize, defaultRole)
+      result.push({ text: line, lineX: leftX })
+      continue
+    }
+
+    if (MATERIAL_TOKEN_RE.test(trimmed) && activeLabel && indentPx > 0) {
+      result.push({ text: line, lineX: leftX + indentPx })
+      continue
+    }
+
+    result.push({ text: line, lineX: leftX })
+  }
+
+  return result
+}
+
+async function reflowIndentedPlainLines(
+  layouts: CompositionPlainLineLayout[],
+  leftX: number,
+  fontSize: number,
+  defaultRole: FontRole,
+): Promise<{ lines: string[]; layouts: CompositionPlainLineLayout[] }> {
+  const lines: string[] = []
+  const nextLayouts: CompositionPlainLineLayout[] = []
+
+  for (const layout of layouts) {
+    const indent = layout.lineX - leftX
+    const lineMax =
+      indent > 0 ? LIVE_LABEL_TEXT_WIDTH_PX - indent : LIVE_LABEL_TEXT_WIDTH_PX
+    const subLines = await expandLiveDisplayLines([layout.text], lineMax, fontSize, defaultRole)
+    for (const sub of subLines) {
+      lines.push(sub)
+      nextLayouts.push({ text: sub, lineX: layout.lineX })
+    }
+  }
+
+  return { lines, layouts: nextLayouts }
+}
+
+/** 整块成分区 / 洗涤建议：与 live 导出同管线，逐行转曲（阿语 appendArabicVisualPath，LTR appendBestLtrLinePath） */
+async function renderCompositionSingleBlock(
+  ownerDocument: Document,
+  group: SVGGElement,
+  textEl: SVGTextElement,
+  fontSize: number,
+  fill: string,
+  defaultRole: FontRole,
+): Promise<boolean> {
+  const rawLeftX = parseCoord(textEl.getAttribute('data-ex-left'), readTextStartX(textEl))
+  const rawRightX = parseCoord(textEl.getAttribute('data-ex-right'), rawLeftX)
+  const { leftX, rightX } = resolveArabicLiveBoxBounds(textEl, rawLeftX, rawRightX)
+  const isPlainComposition = isCompositionPlainSvgBlock(textEl)
+  const isCareAdvice = isCareAdviceLiveNode(textEl)
+  const usesAfterEdge = usesAfterEdgeBaseline(textEl)
+
+  const { content } = extractLiveTextLines(textEl)
+  const rawLines = splitCompositionSingleLines(content)
+  if (!rawLines.length) return false
+
+  const wrapRole: FontRole =
+    isArabicRtlExportContext(textEl) || rawLines.some((line) => isArabicExportText(line))
+      ? 'arabic'
+      : defaultRole
+
+  const maxWidth = resolveLiveWrapMaxWidth(leftX, rightX, {
+    isPlainComposition,
+    isCareAdvice,
+  })
+  let lines = await expandLiveDisplayLines(rawLines, maxWidth, fontSize, wrapRole)
+  if (!lines.length) return false
+
+  let plainLayouts = isPlainComposition
+    ? await layoutCompositionPlainLines(lines, leftX, fontSize, wrapRole)
+    : null
+
+  if (plainLayouts) {
+    const reflowed = await reflowIndentedPlainLines(plainLayouts, leftX, fontSize, wrapRole)
+    lines = reflowed.lines
+    plainLayouts = reflowed.layouts
+  }
+
+  const lineYs = readLiveLineYs(textEl, lines.length)
+  let rendered = false
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i]
+    const lineY = lineYs[i] ?? lineYs[0]
+    const availLeft = plainLayouts?.[i]?.lineX ?? leftX
+
+    if (isArabicExportText(line)) {
+      // 阿语多行：续行不受 plainLayouts 缩进影响，统一用 leftX
+      const lineBounds = resolveArabicLiveBoxBounds(textEl, leftX, rightX, leftX)
+      const arabicFont = await resolveFontForRole('arabic')
+      if (!arabicFont) continue
+      const y = resolvePathY(arabicFont, lineY, fontSize, usesAfterEdge)
+      const width = await appendArabicVisualPath(
+        ownerDocument,
+        group,
+        line,
+        lineBounds.leftX,
+        lineBounds.rightX,
+        y,
+        fontSize,
+        fill,
+      )
+      if (width > 0) rendered = true
+      continue
+    }
+
+    if (isCareAdvice) {
+      const zhFont = await resolveFontForRole('zh')
+      if (!zhFont) continue
+      const y = resolvePathY(zhFont, lineY, fontSize, usesAfterEdge)
+      const width = appendTextPath(
+        ownerDocument,
+        group,
+        zhFont,
+        line,
+        availLeft,
+        y,
+        fontSize,
+        fill,
+      )
+      if (width > 0) rendered = true
+      continue
+    }
+
+    if (isChineseCompositionDigitText(line) || isChineseCompositionPartLine(line)) {
+      const zhFont = await resolveFontForRole('zh')
+      if (!zhFont) continue
+      const y = resolvePathY(zhFont, lineY, fontSize, usesAfterEdge)
+      const width = await appendZhUnifiedTextPath(
+        ownerDocument,
+        group,
+        line,
+        availLeft,
+        y,
+        fontSize,
+        fill,
+      )
+      if (width > 0) rendered = true
+      continue
+    }
+
+    const width = await appendBestLtrLinePath(
+      ownerDocument,
+      group,
+      line,
+      availLeft,
+      lineY,
+      fontSize,
+      fill,
+      defaultRole,
+      usesAfterEdge,
+    )
+    if (width > 0) rendered = true
+  }
+
+  return rendered
+}
+
 async function renderGenericLtrBlock(
   ownerDocument: Document,
   group: SVGGElement,
@@ -295,21 +511,56 @@ async function renderGenericLtrBlock(
 ): Promise<boolean> {
   const tspans = [...textEl.querySelectorAll('tspan')]
   const content = textEl.textContent ?? ''
+  const centerCodes = isProductCodesSvgBlock(textEl)
+
+  const resolveStartX = async (line: string, fallbackX: number): Promise<number> => {
+    if (!centerCodes) return fallbackX
+    const leftX = parseCoord(textEl.getAttribute('data-ex-left'), fallbackX)
+    const rightX = parseCoord(textEl.getAttribute('data-ex-right'), leftX + LIVE_LABEL_TEXT_WIDTH_PX)
+    const lineWidth = await measureMixedWidth(line, fontSize, defaultRole)
+    return resolveCenteredLineStartX(leftX, rightX, lineWidth)
+  }
 
   if (tspans.length === 0) {
-    return renderPlainLineAt(ownerDocument, group, textEl, content, fontSize, fill, async (text, startX, rawY, usesAfterEdge) =>
-      appendBestLtrLinePath(
+    const explicitLines = content.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+    if (explicitLines.length > 1) {
+      const usesAfterEdge = usesAfterEdgeBaseline(textEl)
+      const fallbackX = parseCoord(textEl.getAttribute('x'))
+      const rawY = parseCoord(textEl.getAttribute('y'))
+      const lineStep = parseLineHeight(textEl.getAttribute('line-height'), fontSize)
+      let rendered = false
+      for (let i = 0; i < explicitLines.length; i += 1) {
+        const startX = await resolveStartX(explicitLines[i], fallbackX)
+        const width = await appendBestLtrLinePath(
+          ownerDocument,
+          group,
+          explicitLines[i],
+          startX,
+          rawY + i * lineStep,
+          fontSize,
+          fill,
+          defaultRole,
+          usesAfterEdge,
+        )
+        if (width > 0) rendered = true
+      }
+      return rendered
+    }
+
+    return renderPlainLineAt(ownerDocument, group, textEl, content, fontSize, fill, async (text, startX, rawY, usesAfterEdge) => {
+      const drawX = centerCodes ? await resolveStartX(text, startX) : startX
+      return appendBestLtrLinePath(
         ownerDocument,
         group,
         text,
-        startX,
+        drawX,
         rawY,
         fontSize,
         fill,
         defaultRole,
         usesAfterEdge,
-      ),
-    )
+      )
+    })
   }
 
   const lines = groupTspansByLine(textEl)

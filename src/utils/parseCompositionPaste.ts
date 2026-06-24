@@ -1,6 +1,9 @@
 import type {
   CompositionPart,
   CompositionSection,
+  DownFillColumn,
+  DownFillGrid,
+  DownJacketComposition,
   ExtendedComposition,
   ExtendedCompositionLine,
   LabelData,
@@ -11,12 +14,13 @@ import { createEmptyComposition, createMaterial } from './labelDefaults'
 const PART_ALIASES: Record<string, CompositionPart> = {
   主面料: 'fabric',
   面料: 'fabric',
-  罗纹: 'ribbing',
+  挂面: 'fabric',
   里料: 'lining',
   填充物: 'filling',
+  罗纹: 'ribbing',
 }
 
-const PART_LABEL_PATTERN = '主面料|面料|罗纹|里料|填充物'
+const PART_LABEL_PATTERN = '主面料|面料|挂面|罗纹|里料|填充物'
 const INLINE_PART_SPLIT_RE = new RegExp(`\\s+(?=(?:${PART_LABEL_PATTERN})\\s*[:：])`)
 
 export interface ParsedCompositionPaste {
@@ -267,5 +271,227 @@ export function applyCompositionPaste(current: LabelData, text: string): LabelDa
     ...current,
     composition: parsed.composition,
     extendedComposition: parsed.extended,
+  }
+}
+
+// ================== 羽绒模板粘贴解析 ==================
+
+function createDownFillColumnFrom(size: string, weight: string, index: number): DownFillColumn {
+  return { id: `col-paste-${index}`, size, weight }
+}
+
+// ===== 羽绒模板粘贴解析（单元格式表格） =====
+
+interface RawColumn {
+  cn: string
+  meas: string
+  eur: string
+  us: string
+}
+
+function buildColumnSize(col: RawColumn): string {
+  const parts: string[] = []
+  if (col.cn) parts.push(col.cn)
+  if (col.meas) parts.push(col.meas)
+  if (col.eur) parts.push(col.eur)
+  if (col.us) parts.push(col.us)
+  return parts.join('\n')
+}
+
+export function parseDownJacketPaste(
+  text: string,
+): { downJacket: DownJacketComposition } | null {
+  const rawLines = text.split(/\r?\n/)
+
+  const facingLines: string[] = []
+  let liningLine = ''
+  const stuffingLines: string[] = []
+  let fillGridTitle = ''
+
+  // ========== 阶段1：区分成分行 vs 表格行 ==========
+
+  // 找到"充绒量"行作为分界线
+  let gridStart = rawLines.findIndex((l) => /^充绒量/.test(l.trim()))
+  if (gridStart === -1) {
+    // 没有充绒量标题 → 找第一个 CN: 行
+    gridStart = rawLines.findIndex((l) => /^CN:/.test(l.trim()))
+  }
+  if (gridStart === -1) gridStart = rawLines.length
+
+  // 解析成分区（gridStart 之前的行）—— 标签完全保留用户输入，不硬编码
+  for (let i = 0; i < gridStart; i++) {
+    let line = rawLines[i].trim()
+    if (!line) continue
+    // 去掉首行"成分"
+    if (i === 0) line = line.replace(/^成分/, '').trim()
+    if (!line) continue
+
+    if (/^充绒量/.test(line)) {
+      const afterLabel = line.replace(/^充绒量\s*[:：]?\s*/, '').trim()
+      fillGridTitle = afterLabel ? `充绒量：${afterLabel}` : '充绒量：(单位：克)'
+      continue
+    }
+
+    const split = splitAtFirstColon(line)
+
+    // 没有冒号的行：按关键词归类
+    if (!split) {
+      if (/填充物|绒子含量/.test(line)) {
+        stuffingLines.push(line)
+      } else if (/里料/.test(line)) {
+        liningLine = (liningLine ? liningLine + ' ' : '') + line
+      } else {
+        facingLines.push(line)
+      }
+      continue
+    }
+
+    // 有冒号：按标签关键词归类，保留原始标签文字
+    const { label, value } = split
+    const fullLine = value ? `${label}：${value}` : label
+
+    if (/填充物|绒子含量/.test(label)) {
+      stuffingLines.push(fullLine)
+    } else if (/里料/.test(label)) {
+      liningLine = value || label
+    } else {
+      // 面料、罗纹、挂面、A面面料、B面面料…统统归入 facingLines
+      facingLines.push(fullLine)
+    }
+  }
+
+  // ========== 阶段2：按单元格解析充绒量表格 ==========
+  const gridLines = rawLines.slice(gridStart)
+
+  // 跳过充绒量标题行
+  let gi = 0
+  while (gi < gridLines.length && /^充绒量/.test(gridLines[gi].trim())) {
+    const afterLabel = gridLines[gi].trim().replace(/^充绒量\s*[:：]?\s*/, '').trim()
+    fillGridTitle = afterLabel ? `充绒量：${afterLabel}` : fillGridTitle || '充绒量：(单位：克)'
+    gi++
+  }
+
+  // 收集所有非纯重量行的单元格（size 信息）
+  // 同时记录哪些行是纯重量行
+  const rawColumns: RawColumn[] = []
+  let colIdx = 0
+  const weightLines: { lineIdx: number; cells: string[] }[] = []
+
+  for (let i = gi; i < gridLines.length; i++) {
+    const line = gridLines[i].trim()
+    if (!line) continue
+
+    const cells = line.split('\t').map((c) => c.trim()).filter(Boolean)
+    // 按空格二次切分——克重列可能用空格而非 tab 分隔（如 "123.6 113.3"）
+    // 仅当单元格内所有片段都是数字时才切，防止误拆尺寸列
+    const resolvedCells = cells.flatMap((c) => {
+      const parts = c.split(/\s+/).filter(Boolean)
+      if (parts.length > 1 && parts.every((p) => /^\d+\.?\d*$/.test(p))) return parts
+      return [c]
+    })
+
+    // 判断是否为纯重量行：所有单元格都是数字
+    const allNumeric = resolvedCells.every((c) => /^\d+\.?\d*$/.test(c))
+    if (allNumeric && resolvedCells.length > 0) {
+      weightLines.push({ lineIdx: i, cells: resolvedCells })
+      continue
+    }
+
+    // 按单元格处理 size 信息
+    for (const cell of resolvedCells) {
+      if (/^CN:/.test(cell)) {
+        // 新列
+        rawColumns.push({ cn: cell, meas: '', eur: '', us: '' })
+        colIdx = rawColumns.length - 1
+      } else if (/^\d{2,}\//.test(cell) || /^\d+\/[A-Z]/.test(cell)) {
+        // 号型（如 150/76A）
+        if (colIdx < rawColumns.length) rawColumns[colIdx].meas = cell
+      } else if (/^EUR:/.test(cell)) {
+        if (colIdx < rawColumns.length) rawColumns[colIdx].eur = cell
+      } else if (/^US:/.test(cell)) {
+        if (colIdx < rawColumns.length) rawColumns[colIdx].us = cell
+      }
+    }
+  }
+
+  // 组装列
+  const fillColumns: DownFillColumn[] = rawColumns.map((col, index) =>
+    createDownFillColumnFrom(buildColumnSize(col), '', index),
+  )
+
+  // 回填克重
+  const allWeights = weightLines.flatMap((wl) => wl.cells)
+  const emptyCols = fillColumns.filter((c) => c.weight === '')
+  for (let wi = 0; wi < allWeights.length && wi < emptyCols.length; wi++) {
+    const idx = fillColumns.findIndex((c) => c.weight === '')
+    if (idx >= 0) {
+      fillColumns[idx] = { ...fillColumns[idx], weight: allWeights[wi] }
+    }
+  }
+
+  const fillGrid: DownFillGrid = {
+    title: fillGridTitle,
+    columns: fillColumns,
+  }
+
+  return {
+    downJacket: {
+      facingLines,
+      liningLine,
+      stuffingLines,
+      fillGrid,
+    },
+  }
+}
+
+export function applyDownJacketPaste(current: LabelData, text: string): LabelData {
+  const parsed = parseDownJacketPaste(text)
+  if (!parsed) return current
+
+  return {
+    ...current,
+    downJacket: parsed.downJacket,
+  }
+}
+
+// ================== 青蛙模板粘贴解析 ==================
+
+/** 解析青蛙模板成分文本："材料名 数字"格式 → "数字% 材料名"
+ * 示例输入：聚酯纤维 30.0\\n粘纤 25\\n腈纶 25.8\\n锦纶 19.2
+ * 示例输出：[{percentage:'30.0%',name:'聚酯纤维'}, ...] 归入 fabric */
+export function parseFrogComposition(
+  text: string,
+): { fabric: { id: string; percentage: string; name: string }[] } {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+  const items: { id: string; percentage: string; name: string }[] = []
+
+  for (const line of lines) {
+    // 匹配 "材料名 数字" 或 "材料名 数字%" 格式
+    const match = line.match(/^(.+?)\s+(\d+\.?\d*)\s*%?\s*$/)
+    if (match) {
+      const name = match[1].trim()
+      const pct = match[2]
+      items.push({ id: crypto.randomUUID(), percentage: `${pct}%`, name })
+    } else {
+      // 无法解析的行，作为纯文本保留（如备注）
+      if (items.length > 0) {
+        items[items.length - 1].name += ' ' + line
+      }
+    }
+  }
+
+  return { fabric: items }
+}
+
+export function applyFrogCompositionPaste(current: LabelData, text: string): LabelData {
+  const parsed = parseFrogComposition(text)
+  return {
+    ...current,
+    composition: {
+      fabric: parsed.fabric,
+      ribbing: [],
+      lining: [],
+      filling: [],
+    },
   }
 }

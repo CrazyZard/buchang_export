@@ -11,10 +11,10 @@ import {
 } from './flattenCompositionBlocksForLive'
 import { flattenInlineTextSpans } from './flattenExportTextSpans'
 import { mergeLiveSingleTextBlocks } from './mergeLiveSingleTextBlocks'
-import { expandLiveDisplayLines, extractLiveTextLines } from './exportTextLiveGeometry'
+import { expandLiveDisplayLines, extractLiveTextLines, LIVE_LABEL_TEXT_WIDTH_PX, measureMixedWidth } from './exportTextLiveGeometry'
 import { toArabicVisualBaseString } from './arabicVisualOrder'
 import { FZ_PERCENT_GLYPH } from './textScriptDetect'
-import { PDF_FONT_FZ, PDF_FONT_GO } from './pdfFontFamilies'
+import { PDF_FONT_ARIAL, PDF_FONT_FZ, PDF_FONT_GO } from './pdfFontFamilies'
 import { prepareSvgForEditablePdf } from './prepareSvgForEditablePdf'
 
 function assert(condition: boolean, message: string): void {
@@ -175,6 +175,19 @@ async function testWrapLongCareAdvice(): Promise<void> {
   assert(wrapped.length > 1, `长洗涤建议未折行: ${wrapped.length}`)
 }
 
+async function testRussianFootnoteWrapsWithinLabel(): Promise<void> {
+  const footnote = '(Кроме аппликации/рисунка тюля)'
+  const wrapped = await expandLiveDisplayLines([footnote], LIVE_LABEL_TEXT_WIDTH_PX, 8, 'latin')
+  assert(wrapped.length > 1, `俄文脚注应折行: ${wrapped.join(' | ')}`)
+  for (const line of wrapped) {
+    const width = await measureMixedWidth(line, 8, 'latin')
+    assert(
+      width <= LIVE_LABEL_TEXT_WIDTH_PX + 1,
+      `折行后仍超宽: ${line} width=${width}`,
+    )
+  }
+}
+
 function testDownJacketIncluded(): void {
   const root = parseFixture(`
     <div class="wash-label wash-label--source wash-label--bala-down">
@@ -273,15 +286,183 @@ function testPrepareSvgMapsGoPostScriptName(): void {
   )
 }
 
+function testPrepareSvgMapsFzChineseDisplayNameToPostScript(): void {
+  const { document } = parseHTML(`<!DOCTYPE html><html><body>
+    <svg xmlns="http://www.w3.org/2000/svg">
+      <text x="0" y="20" font-family="方正兰亭细黑简体">锦纶</text>
+    </svg>
+  </body></html>`)
+  const svg = document.querySelector('svg') as unknown as SVGSVGElement
+  const textEl = svg.querySelector('text') as unknown as SVGTextElement
+  prepareSvgForEditablePdf(svg)
+  const family = (textEl.getAttribute('font-family') ?? '').replace(/['"]/g, '')
+  assert(
+    family === PDF_FONT_FZ,
+    `FZ 中文显示名应映射为 PostScript 名 ${PDF_FONT_FZ}，实际 ${family}`,
+  )
+  assert(
+    !/[^\x00-\x7F]/.test(family),
+    `PDF 字体名须为 ASCII，实际 ${family}`,
+  )
+}
+
 function testArabicBidiVisualOrder(): void {
   const logical = 'أكريليك'
   const visual = toArabicVisualBaseString(logical)
-  assert(visual !== logical, '纯阿语须经 bidi 转为视觉序')
+  assert(visual !== logical, '转曲管线：纯阿语须经 bidi 转为视觉序')
   assert(visual === 'كيليركأ', `视觉序错误: ${visual}`)
 
   const mixed = '57.7%أكريليك'
   const mixedVisual = toArabicVisualBaseString(mixed)
   assert(mixedVisual === 'كيليركأ57.7%', `混排视觉序错误: ${mixedVisual}`)
+}
+
+async function testArabicLiveLongLineStaysVisibleAfterPrepare(): Promise<void> {
+  const { appendArabicLiveTspans } = await import('./exportTextLiveUtils')
+  const longLine =
+    'النسيج الرئيسي: 57.7% أكريليك 36.6% نايلون 5.7% صوف ميرينو 3.4% قطن'
+  const { document } = parseHTML(
+    `<!DOCTYPE html><html><body><svg xmlns="http://www.w3.org/2000/svg"><g class="live-export-single-text composition-plain" dir="rtl"><text data-ex-left="0" data-ex-right="94"></text></g></svg></body></html>`,
+  )
+  const svg = document.querySelector('svg') as unknown as SVGSVGElement
+  const textEl = svg.querySelector('text') as unknown as SVGTextElement
+
+  await appendArabicLiveTspans(textEl, longLine, 0, 94, 20, 6, '#000')
+  prepareSvgForEditablePdf(svg)
+
+  const tspans = [...textEl.querySelectorAll('tspan')].filter((t) => (t.textContent ?? '').trim())
+  assert(tspans.length >= 1, '长阿语行应有 tspan')
+  for (const tspan of tspans) {
+    const x = parseFloat(tspan.getAttribute('x') ?? 'NaN')
+    assert(
+      Number.isFinite(x) && x >= 0 && x <= 94,
+      `长阿语行 x 不应跑出画布: ${x} text=${JSON.stringify(tspan.textContent)}`,
+    )
+    assert(!tspan.getAttribute('text-anchor'), 'prepare 后不应保留 text-anchor=end')
+  }
+  assert(
+    tspans.some((t) => (t.textContent ?? '').length > 0),
+    '长阿语行内容不应被清空',
+  )
+}
+
+async function testArabicLivePrepareConvertsEndAnchor(): Promise<void> {
+  const { appendArabicLiveTspans, resolveArabicLiveBoxBounds } = await import('./exportTextLiveUtils')
+  const { document } = parseHTML(
+    `<!DOCTYPE html><html><body><svg xmlns="http://www.w3.org/2000/svg"><g class="rtl composition-plain"><text data-ex-left="0" data-ex-right="94"></text></g></svg></body></html>`,
+  )
+  const svg = document.querySelector('svg') as unknown as SVGSVGElement
+  const textEl = svg.querySelector('text') as unknown as SVGTextElement
+
+  const bounds = resolveArabicLiveBoxBounds(textEl, 0, 94)
+  await appendArabicLiveTspans(textEl, 'المكونات:', bounds.leftX, bounds.rightX, 20, 12, '#000')
+  prepareSvgForEditablePdf(svg)
+  const tspans = [...textEl.querySelectorAll('tspan')]
+  assert(tspans.length >= 1, '应有阿语 tspan')
+  assert(!tspans[0]?.getAttribute('text-anchor'), 'prepare 应将右锚换算为左锚 x')
+  const x = parseFloat(tspans[0]?.getAttribute('x') ?? 'NaN')
+  assert(x > 0 && x < 94, `阿语应靠右排列（x 在 0~94 内偏右）: ${x}`)
+}
+
+async function testArabicSurvivesZeroTextLengthCaptured(): Promise<void> {
+  const { appendArabicLiveTspans, resolveArabicLiveBoxBounds } = await import('./exportTextLiveUtils')
+  const { document } = parseHTML(
+    `<!DOCTYPE html><html><body><svg xmlns="http://www.w3.org/2000/svg"><g class="live-export-single-text composition-plain" dir="rtl"><text direction="rtl" data-ex-left="73.51" data-ex-right="73.51">المكونات:</text></g></svg></body></html>`,
+  )
+  const svg = document.querySelector('svg') as unknown as SVGSVGElement
+  const textEl = svg.querySelector('text') as unknown as SVGTextElement
+
+  const bounds = resolveArabicLiveBoxBounds(textEl, 73.51, 73.51)
+  assert(bounds.leftX === 0, `textLength=0 捕获左缘应忽略右锚: ${bounds.leftX}`)
+  assert(bounds.rightX === LIVE_LABEL_TEXT_WIDTH_PX, `阿语右缘应贴 25mm: ${bounds.rightX}`)
+
+  await appendArabicLiveTspans(textEl, 'المكونات:', bounds.leftX, bounds.rightX, 20, 12, '#000')
+  for (const tspan of textEl.querySelectorAll('tspan')) {
+    const x = parseFloat(tspan.getAttribute('x') ?? 'NaN')
+    assert(
+      Number.isFinite(x) && x >= 0 && x <= LIVE_LABEL_TEXT_WIDTH_PX,
+      `textLength=0 时阿语 x 应在画布内: ${x}`,
+    )
+  }
+}
+
+async function testArabicSurvivesOverflowCapturedRight(): Promise<void> {
+  const { appendArabicLiveTspans, resolveArabicLiveBoxBounds } = await import('./exportTextLiveUtils')
+  const { document } = parseHTML(
+    `<!DOCTYPE html><html><body><svg xmlns="http://www.w3.org/2000/svg"><g class="live-export-single-text composition-plain" dir="rtl"><text data-ex-left="0" data-ex-right="220">المكونات:</text></g></svg></body></html>`,
+  )
+  const svg = document.querySelector('svg') as unknown as SVGSVGElement
+  const textEl = svg.querySelector('text') as unknown as SVGTextElement
+
+  const bounds = resolveArabicLiveBoxBounds(textEl, 0, 220)
+  assert(bounds.rightX === LIVE_LABEL_TEXT_WIDTH_PX, `阿语右缘应贴 25mm: ${bounds.rightX}`)
+
+  await appendArabicLiveTspans(textEl, 'المكونات:', bounds.leftX, bounds.rightX, 20, 12, '#000')
+  prepareSvgForEditablePdf(svg)
+
+  for (const tspan of textEl.querySelectorAll('tspan')) {
+    const x = parseFloat(tspan.getAttribute('x') ?? 'NaN')
+    assert(
+      Number.isFinite(x) && x >= 0 && x <= LIVE_LABEL_TEXT_WIDTH_PX,
+      `溢出 capturedRight 时阿语 x 仍应在画布内: ${x}`,
+    )
+  }
+}
+
+function testFlattenPreservesArabicDir(): void {
+  const root = parseFixture(`
+    <div class="wash-label wash-label--translated wash-label--balabala">
+      <div class="lang-block rtl">
+        <div class="label-translated-body">
+          <div class="live-export-single-text composition-plain" dir="rtl" data-plain-text="أكريليك">
+            <span class="composition-plain-line">أكريليك</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  `)
+  const restore = flattenCompositionBlocksForLive(root)
+  const plain = root.querySelector('.composition-plain') as HTMLElement
+  assert(plain?.getAttribute('dir') === 'rtl', 'live 压平应保留 dir=rtl')
+  assert(plain?.style.textAlign === 'right', 'live 压平应保留右对齐')
+  restore()
+}
+
+async function testArabicLiveKeepsLogicalOrder(): Promise<void> {
+  const { appendArabicLiveTspans } = await import('./exportTextLiveUtils')
+  const { document } = parseHTML(
+    `<!DOCTYPE html><html><body><svg xmlns="http://www.w3.org/2000/svg"><g class="rtl composition-plain"><text data-ex-left="0" data-ex-right="94"></text></g></svg></body></html>`,
+  )
+  const textEl = document.querySelector('text') as unknown as SVGTextElement
+
+  await appendArabicLiveTspans(textEl, 'المكونات:', 0, 94, 20, 12, '#000')
+  const tspans = [...textEl.querySelectorAll('tspan')]
+  assert(tspans.length >= 1, '应有阿语 tspan')
+  assert(tspans[0]?.getAttribute('text-anchor') === 'end', '阿语应右锚对齐')
+  assert(tspans[0]?.getAttribute('x') === '94', `阿语应锚在右缘: ${tspans[0]?.getAttribute('x')}`)
+  assert(
+    tspans[0]?.textContent === 'المكونات:',
+    `live 阿语应写逻辑序: ${JSON.stringify(tspans[0]?.textContent)}`,
+  )
+  assert(
+    !tspans.some((t) => (t.textContent ?? '').includes('كيليركأ')),
+    'live 阿语不应 bidi 反序',
+  )
+
+  const mixedEl = document.createElementNS('http://www.w3.org/2000/svg', 'text') as unknown as SVGTextElement
+  await appendArabicLiveTspans(mixedEl, '57.7%أكريليك', 0, 94, 20, 12, '#000')
+  const mixedTspans = [...mixedEl.querySelectorAll('tspan')]
+  const mixedRuns = mixedTspans.map((t) => t.textContent ?? '')
+  assert(mixedRuns.includes('57.7') && mixedRuns.length === 3, `混排应 3 段: ${JSON.stringify(mixedRuns)}`)
+  assert(mixedRuns.includes('أكريليك'), `混排阿语段应为逻辑序: ${JSON.stringify(mixedRuns)}`)
+  const digitIdx = mixedRuns.indexOf('57.7')
+  const percentIdx = mixedRuns.findIndex((t) => t.includes('％') || t === '%')
+  const arabicIdx = mixedRuns.indexOf('أكريليك')
+  assert(digitIdx >= 0 && percentIdx > digitIdx, `57.7% 应作 LTR 单元: ${JSON.stringify(mixedRuns)}`)
+  assert(
+    mixedTspans[arabicIdx]?.getAttribute('text-anchor') === 'end',
+    '阿语材质段应右锚',
+  )
 }
 
 function testPrepareSvgStripsRtlDirection(): void {
@@ -340,6 +521,27 @@ function testPrepareSvgSplitsPercentFromDigits(): void {
   assert(percentFamily.includes(PDF_FONT_FZ), `% 应为 ${PDF_FONT_FZ}，实际 ${percentFamily}`)
 }
 
+async function testProductCodesCenteredInLiveExport(): Promise<void> {
+  const { convertTextElementToLive } = await import('./exportTextLiveRender')
+  const { document } = parseHTML(`<!DOCTYPE html><html><body>
+    <svg xmlns="http://www.w3.org/2000/svg">
+      <g class="product-codes">
+        <text x="10" y="20" data-ex-left="0" data-ex-right="94" font-size="12" fill="#000">202426103123\n1227</text>
+      </g>
+    </svg>
+  </body></html>`)
+  const svg = document.querySelector('svg') as unknown as SVGSVGElement
+  const textEl = svg.querySelector('text') as unknown as SVGTextElement
+  await convertTextElementToLive(textEl)
+
+  const tspans = [...textEl.querySelectorAll('tspan')]
+  assert(tspans.length >= 2, `工厂代码应有多行 tspan，实际 ${tspans.length}`)
+  const xs = tspans.map((t) => parseFloat(t.getAttribute('x') || 'NaN'))
+  assert(xs.every((x) => Number.isFinite(x) && x >= 0 && x <= 80), `工厂代码应居中在画布内: ${xs.join(',')}`)
+  assert(xs[0]! < 30, `款号行应居中（x<30），实际 ${xs[0]}`)
+  assert(xs[1]! > 10, `工厂代码行应居中（x>10），实际 ${xs[1]}`)
+}
+
 function testProductCodesPreserveTwoLines(): void {
   const root = parseFixture(`
     <div class="wash-label wash-label--source wash-label--balabala">
@@ -355,10 +557,10 @@ function testProductCodesPreserveTwoLines(): void {
 
   const restoreFlatten = flattenInlineTextSpans(root)
   const codes = root.querySelector('.product-codes') as HTMLElement
-  assert(
-    codes?.textContent === '202426103123\n1227',
-    `款号/工厂代码换行丢失: ${JSON.stringify(codes?.textContent)}`,
-  )
+  const rows = [...codes?.querySelectorAll(':scope > div') ?? []]
+  assert(rows.length === 2, `款号/工厂代码应保持两行 DOM，实际 ${rows.length}`)
+  assert(rows[0]?.textContent === '202426103123', `款号错误: ${rows[0]?.textContent}`)
+  assert(rows[1]?.textContent === '1227', `工厂代码错误: ${rows[1]?.textContent}`)
   restoreFlatten()
 
   const { document } = parseHTML(`<!DOCTYPE html><html><body>
@@ -402,6 +604,22 @@ function testMergeCareAdviceWordFragments(): void {
   )
 }
 
+function testPrepareSvgMapsArabicFont(): void {
+  const { document } = parseHTML(`<!DOCTYPE html><html><body>
+    <svg xmlns="http://www.w3.org/2000/svg">
+      <text x="0" y="20" font-family="ARIAL, Arial, sans-serif">أكريليك</text>
+    </svg>
+  </body></html>`)
+  const svg = document.querySelector('svg') as unknown as SVGSVGElement
+  const textEl = svg.querySelector('text') as unknown as SVGTextElement
+  prepareSvgForEditablePdf(svg)
+  const family = (textEl.getAttribute('font-family') ?? '').replace(/['"]/g, '')
+  assert(
+    family === PDF_FONT_ARIAL,
+    `阿语应映射为 ${PDF_FONT_ARIAL}（避免 svg2pdf 把 Arial 当成 Helvetica），实际 ${family}`,
+  )
+}
+
 async function runAll(): Promise<void> {
   testChineseSourceComposition()
   testTranslatedGridAlignSpace()
@@ -410,14 +628,24 @@ async function runAll(): Promise<void> {
   testLiveFlattenPipelinePreservesText()
   testExtractMultiTspanLines()
   await testWrapLongCareAdvice()
+  await testRussianFootnoteWrapsWithinLabel()
   testDownJacketIncluded()
   testMergeSameYCompositionFragments()
   testArabicBidiVisualOrder()
+  await testArabicLiveKeepsLogicalOrder()
+  await testArabicLivePrepareConvertsEndAnchor()
+  await testArabicSurvivesZeroTextLengthCaptured()
+  await testArabicSurvivesOverflowCapturedRight()
+  await testArabicLiveLongLineStaysVisibleAfterPrepare()
+  testFlattenPreservesArabicDir()
   testPrepareSvgStripsRtlDirection()
   testPrepareSvgMapsFzDisplayName()
   testPrepareSvgMapsGoPostScriptName()
+  testPrepareSvgMapsFzChineseDisplayNameToPostScript()
+  testPrepareSvgMapsArabicFont()
   testPrepareSvgSplitsPercentFromDigits()
   testProductCodesPreserveTwoLines()
+  await testProductCodesCenteredInLiveExport()
   testMergeCareAdviceWordFragments()
   await testPercentUsesFzFont()
   console.log('verify:live-export 全部通过')

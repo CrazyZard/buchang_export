@@ -1,4 +1,9 @@
-import { ARABIC_RE, FZ_PERCENT_GLYPH, splitTextByFontRole } from './textScriptDetect'
+import {
+  ARABIC_RE,
+  FZ_PERCENT_GLYPH,
+  isDigitThenPercentPair,
+  splitTextByFontRole,
+} from './textScriptDetect'
 import type { FontRole } from './svgTextToPathsUtils'
 import type { CSSProperties, ReactNode } from 'react'
 import { LIVE_EXPORT_SINGLE_TEXT_CLASS } from './flattenCompositionBlocksForLive'
@@ -28,6 +33,17 @@ function renderFontRun(content: string, role: FontRole, key: number): ReactNode 
       </span>
     )
   }
+  // zh-role run starting with %：split to apply composition-percent class
+  // (e.g. %锦纶 → ％ with FZ + 锦纶 inheriting parent)
+  if (role === 'zh' && /^[%％]/.test(content)) {
+    const rest = content.slice(1)
+    return (
+      <>
+        <span key={`${key}-pct`} className="composition-percent">{FZ_PERCENT_GLYPH}</span>
+        {rest && <span key={`${key}-rest`}>{rest}</span>}
+      </>
+    )
+  }
   if (role === 'latin' && /[a-zA-Z]/.test(content)) {
     return (
       <span key={key} className="label-latin">
@@ -38,12 +54,41 @@ function renderFontRun(content: string, role: FontRole, key: number): ReactNode 
   return <span key={key}>{content}</span>
 }
 
+function renderDigitPercentLtr(digits: string, key: number): ReactNode {
+  return (
+    <span key={key} className="composition-digit-percent" dir="ltr">
+      <span className="label-latin">{digits}</span>
+      <span className="composition-percent">{FZ_PERCENT_GLYPH}</span>
+    </span>
+  )
+}
+
+/** 阿语 RTL：数字+% 须包在 LTR 隔离段，避免 bidi 显示成 %57.7 */
+function renderArabicCompositionLine(line: string): ReactNode {
+  const runs = splitTextByFontRole(line, 'arabic')
+  const nodes: ReactNode[] = []
+  for (let i = 0; i < runs.length; i += 1) {
+    const run = runs[i]
+    const next = runs[i + 1]
+    if (isDigitThenPercentPair(run, next)) {
+      nodes.push(renderDigitPercentLtr(run.content, i))
+      i += 1
+      continue
+    }
+    nodes.push(renderFontRun(run.content, run.role, i))
+  }
+  return nodes
+}
+
 /** 预览：整段可复制，行内数字 GO / % FZ */
 export function renderPlainCompositionLine(line: string, useLatinDigits: boolean): ReactNode {
   if (!useLatinDigits) return line
 
-  const defaultRole: FontRole = isArabicCompositionToken(line) ? 'arabic' : 'zh'
-  const runs = splitTextByFontRole(line, defaultRole)
+  if (isArabicCompositionToken(line)) {
+    return renderArabicCompositionLine(line)
+  }
+
+  const runs = splitTextByFontRole(line, 'zh')
   return runs.map((run, index) => renderFontRun(run.content, run.role, index))
 }
 
@@ -111,10 +156,18 @@ export function renderCompositionToken(token: string, useLatinDigits: boolean) {
 
   const [, digits, percent, rest] = match
 
+  const digitPercent = percent ? (
+    <span className="composition-digit-percent" dir="ltr">
+      <span className="label-latin">{digits}</span>
+      <span className="composition-percent">{FZ_PERCENT_GLYPH}</span>
+    </span>
+  ) : (
+    <span className="label-latin">{digits}</span>
+  )
+
   return (
     <>
-      <span className="label-latin">{digits}</span>
-      {percent ? <span className="composition-percent">{FZ_PERCENT_GLYPH}</span> : null}
+      {digitPercent}
       {rest}
     </>
   )

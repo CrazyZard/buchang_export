@@ -135,13 +135,31 @@ export function collectCareAdviceText(el: HTMLElement): string {
     .join('\n')
 }
 
-function replaceWithSingleTextDiv(el: HTMLElement, text: string, extraClass = ''): void {
+function detectFlattenDir(el: HTMLElement): 'rtl' | undefined {
+  const host =
+    el.querySelector<HTMLElement>('.composition-plain, .live-export-single-text') ?? el
+  const dir = host.getAttribute('dir')
+  if (dir === 'rtl') return 'rtl'
+  if (el.closest('.lang-block.rtl')) return 'rtl'
+  return undefined
+}
+
+function replaceWithSingleTextDiv(
+  el: HTMLElement,
+  text: string,
+  extraClass = '',
+  dir?: 'rtl' | 'ltr',
+): void {
   const wrapper = el.ownerDocument.createElement('div')
   wrapper.className = `${LIVE_EXPORT_SINGLE_TEXT_CLASS}${extraClass ? ` ${extraClass}` : ''}`.trim()
   const hasExplicitBreaks = text.includes('\n')
   wrapper.style.whiteSpace = hasExplicitBreaks ? 'pre-wrap' : 'normal'
   wrapper.style.wordBreak = 'normal'
   wrapper.textContent = text
+  if (dir === 'rtl') {
+    wrapper.setAttribute('dir', 'rtl')
+    wrapper.style.textAlign = 'right'
+  }
   el.replaceChildren(wrapper)
 }
 
@@ -163,7 +181,7 @@ export function flattenCompositionBlocksForLive(root: HTMLElement): () => void {
       return
     }
     snapshots.push({ el, html: el.innerHTML })
-    replaceWithSingleTextDiv(el, text, extraClass)
+    replaceWithSingleTextDiv(el, text, extraClass, detectFlattenDir(el))
   }
 
   root

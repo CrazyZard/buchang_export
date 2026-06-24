@@ -10,6 +10,47 @@ export function isCareAdviceLiveNode(node: Element): boolean {
   return Boolean(node.closest('g.care-advice-live, .care-advice-live'))
 }
 
+function nodeHasClass(node: Element, className: string): boolean {
+  const cls = node.getAttribute('class') ?? ''
+  return cls.split(/\s+/).includes(className)
+}
+
+function closestExportContainer(textEl: Element, selector: string): Element | null {
+  if (typeof textEl.closest === 'function') {
+    const hit = textEl.closest(selector)
+    if (hit) return hit
+  }
+
+  const wanted = selector
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+
+  let node: Element | null = textEl
+  while (node) {
+    const tagName = (node.tagName ?? '').toLowerCase()
+    for (const part of wanted) {
+      if (part.startsWith('.')) {
+        if (nodeHasClass(node, part.slice(1))) return node
+        continue
+      }
+      const dot = part.indexOf('.')
+      const tag = dot >= 0 ? part.slice(0, dot) : part
+      const className = dot >= 0 ? part.slice(dot + 1) : ''
+      if (className && tagName === tag && nodeHasClass(node, className)) {
+        return node
+      }
+      if (!className && tagName === tag) return node
+    }
+    node = node.parentElement
+  }
+  return null
+}
+
+export function isProductCodesSvgBlock(textEl: SVGTextElement): boolean {
+  return Boolean(closestExportContainer(textEl, 'g.product-codes, .product-codes'))
+}
+
 /**
  * 导出转曲块类型 — 每种类型有独立的 prepare / render / flatten 逻辑，
  * 互不影响，避免修阿语时破坏俄文、修中文时破坏翻译区。

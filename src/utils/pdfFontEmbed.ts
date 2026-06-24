@@ -1,5 +1,6 @@
 import type { jsPDF } from 'jspdf'
-import { PDF_FONT_ARIAL, PDF_FONT_FZ, PDF_FONT_GO, PDF_FONT_VFS } from './pdfFontFamilies'
+import { PDF_FONT_ARIAL, PDF_FONT_FZ, PDF_FONT_GO, PDF_FONT_MISANS, PDF_FONT_VFS, PDF_FONT_MISANS_VFS } from './pdfFontFamilies'
+import { isMixedArabicExportLine } from './arabicTextExport'
 
 const BASE_URL = import.meta.env?.BASE_URL ?? '/'
 
@@ -26,14 +27,15 @@ export function resetEmbeddedPdfFontCache(): void {
   embeddedPdf = null
 }
 
-/** 向 jsPDF 嵌入洗唛字体（CenturyGothic / FZLanTingHeiS-L-GB / ArialMT），供 svg2pdf 可编辑文字 */
+/** 向 jsPDF 嵌入洗唛字体（CenturyGothic / FZLTXIHJW--GB1-0 / ArialMT），供 svg2pdf 可编辑文字 */
 export async function embedWashLabelPdfFonts(pdf: jsPDF): Promise<void> {
   if (embeddedPdf === pdf) return
 
-  const [go, fz, ar] = await Promise.all([
+  const [go, fz, ar, misans] = await Promise.all([
     fetchFontBase64(`${BASE_URL}fonts/GO.TTF`),
     fetchFontBase64(`${BASE_URL}fonts/FZ.TTF`),
     fetchFontBase64(`${BASE_URL}fonts/ARIAL.TTF`),
+    fetchFontBase64(`${BASE_URL}fonts/MiSans-Regular.ttf`).catch(() => null),
   ])
 
   pdf.addFileToVFS(PDF_FONT_VFS.latin, go)
@@ -43,10 +45,20 @@ export async function embedWashLabelPdfFonts(pdf: jsPDF): Promise<void> {
 
   pdf.addFileToVFS(PDF_FONT_VFS.zh, fz)
   pdf.addFont(PDF_FONT_VFS.zh, PDF_FONT_FZ, 'normal', 'Identity-H')
+  pdf.addFont(PDF_FONT_VFS.zh, 'FZLanTingHeiS-L-GB', 'normal', 'Identity-H')
   pdf.addFont(PDF_FONT_VFS.zh, 'FZ', 'normal', 'Identity-H')
+  // 勿用 TTF 内中文显示名（如「方正兰亭细黑简体」）作 addFont 别名 —— jsPDF Name 仅接受 ASCII；
+  // AI 仍会从嵌入字体的 name 表显示中文族名。
 
   pdf.addFileToVFS(PDF_FONT_VFS.arabic, ar)
   pdf.addFont(PDF_FONT_VFS.arabic, PDF_FONT_ARIAL, 'normal', 'Identity-H')
+  pdf.addFont(PDF_FONT_VFS.arabic, 'ARIAL', 'normal', 'Identity-H')
+
+  if (misans) {
+    pdf.addFileToVFS(PDF_FONT_MISANS_VFS, misans)
+    pdf.addFont(PDF_FONT_MISANS_VFS, PDF_FONT_MISANS, 'normal', 'Identity-H')
+    pdf.addFont(PDF_FONT_MISANS_VFS, 'MiSans-Regular', 'normal', 'Identity-H')
+  }
 
   const list = pdf.getFontList()
   if (!list[PDF_FONT_GO] || !list[PDF_FONT_FZ] || !list[PDF_FONT_ARIAL]) {
@@ -57,6 +69,7 @@ export async function embedWashLabelPdfFonts(pdf: jsPDF): Promise<void> {
 }
 
 const ARABIC_CHAR_RE = /[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff]/
+const ARABIC_PRESENTATION_RE = /[\ufb50-\ufdff\ufe70-\ufeff]/
 
 function flattenPdfTextArg(text: unknown): string {
   if (typeof text === 'string') return text
@@ -68,26 +81,27 @@ function flattenPdfTextArg(text: unknown): string {
   return String(text ?? '')
 }
 
-function isMixedArabicExportLine(text: string): boolean {
-  return /[0-9.]/.test(text) || text.includes('%')
-}
-
 function applyLiveArabicTextOptions(flat: string, opts: Record<string, unknown>): void {
-  if (!ARABIC_CHAR_RE.test(flat)) return
+  if (!ARABIC_CHAR_RE.test(flat) && !ARABIC_PRESENTATION_RE.test(flat)) return
 
-  if (isMixedArabicExportLine(flat)) {
-    // 整块混排（单文本框）：逻辑序，jsPDF 统一 bidi
-    opts.isInputVisual = false
+  // 呈现形 + isInputVisual 会让 jsPDF 二次 bidi → PDF 空白；live 导出应写逻辑序
+  if (ARABIC_PRESENTATION_RE.test(flat)) {
+    opts.isInputVisual = true
     opts.isOutputVisual = true
-    opts.isInputRtl = true
     return
   }
 
-  // 视觉序拆出的纯阿语短段
-  opts.isInputVisual = true
+  if (isMixedArabicExportLine(flat)) {
+    opts.isInputVisual = true
+    opts.isOutputVisual = true
+    opts.isInputRtl = true
+    opts.isOutputRtl = true
+    return
+  }
+
+  opts.isInputVisual = false
   opts.isOutputVisual = true
   opts.isInputRtl = true
-  opts.isOutputRtl = true
 }
 
 /**
@@ -96,16 +110,16 @@ function applyLiveArabicTextOptions(flat: string, opts: Record<string, unknown>)
 export function patchPdfLiveTextPipeline(pdf: jsPDF): () => void {
   const api = pdf as JsPdfWithArabicHook
   const savedProcessArabic = api.processArabic
-  const savedText = api.text.bind(pdf)
+  const savedText = api.text
 
   api.processArabic = ((arg: string | { text: unknown }) => arg) as NonNullable<
     JsPdfWithArabicHook['processArabic']
   >
 
-  api.text = function patchedText(text, x, y, options, transform) {
+  api.text = function patchedText(this: jsPDF, text, x, y, options, transform) {
     const opts = { ...(options as Record<string, unknown> | undefined) }
     applyLiveArabicTextOptions(flattenPdfTextArg(text), opts)
-    return savedText(text, x, y, opts as never, transform)
+    return savedText.call(this, text, x, y, opts as never, transform)
   }
 
   return () => {

@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react'
 import type { BatchLabelItem } from '../types'
-import { exportBatchExcelTemplate, parseBatchExcelFile } from '../utils/parseBatchExcel'
+import { exportBatchExcelTemplate, exportFrogBatchExcelTemplate, exportFrogDownBatchExcelTemplate, parseBatchExcelFile, parseFrogDownBatchExcel } from '../utils/parseBatchExcel'
 import type { LabelData } from '../types'
 
 interface BatchExcelImportProps {
   baseLabelData: LabelData
   batchCount: number
+  templateId?: string
   onImport: (items: BatchLabelItem[]) => void
   onClear: () => void
 }
@@ -13,6 +14,7 @@ interface BatchExcelImportProps {
 export function BatchExcelImport({
   baseLabelData,
   batchCount,
+  templateId,
   onImport,
   onClear,
 }: BatchExcelImportProps) {
@@ -22,7 +24,13 @@ export function BatchExcelImport({
   const handleFile = async (file: File) => {
     setImporting(true)
     try {
-      const items = await parseBatchExcelFile(file, baseLabelData)
+      let items: BatchLabelItem[]
+      if (templateId === 'frog-down') {
+        const buffer = await file.arrayBuffer()
+        items = parseFrogDownBatchExcel(buffer, baseLabelData)
+      } else {
+        items = await parseBatchExcelFile(file, baseLabelData, templateId)
+      }
       onImport(items)
     } catch (err) {
       alert(err instanceof Error ? err.message : '批量 Excel 解析失败')
@@ -42,7 +50,7 @@ export function BatchExcelImport({
         )}
       </div>
       <div className="batch-excel-import-actions">
-        <button type="button" className="btn-secondary" onClick={() => exportBatchExcelTemplate()}>
+        <button type="button" className="btn-secondary" onClick={() => (templateId === 'frog-down' ? exportFrogDownBatchExcelTemplate() : templateId === 'frog' ? exportFrogBatchExcelTemplate() : exportBatchExcelTemplate())}>
           下载批量模板
         </button>
         <button

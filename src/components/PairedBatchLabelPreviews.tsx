@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import { ScaledLabelPreview } from './ScaledLabelPreview'
 import { WashLabelPreview } from './WashLabelPreview'
+import { useTemplate } from '../context/TemplateContext'
 import type { BatchLabelItem, Dictionary } from '../types'
 import { formatLabelSizeMm, LABEL_WIDTH_MM, pxToMm } from '../utils/labelMeasure'
 
@@ -17,6 +18,8 @@ export function PairedBatchLabelPreviews({
   dictionary,
   outputLanguages,
 }: PairedBatchLabelPreviewsProps) {
+  const template = useTemplate()
+  const labelWidth = template.layout.labelWidthMm ?? LABEL_WIDTH_MM
   const sourceScrollRef = useRef<HTMLDivElement>(null)
   const translatedScrollRef = useRef<HTMLDivElement>(null)
   const syncingScrollRef = useRef(false)
@@ -64,7 +67,7 @@ export function PairedBatchLabelPreviews({
         }
 
         const pairedMm = pxToMm(maxRowPx)
-        const sizeText = formatLabelSizeMm(LABEL_WIDTH_MM, pairedMm)
+        const sizeText = formatLabelSizeMm(labelWidth, pairedMm)
         const sourceSize = sourceRow.querySelector('.batch-preview-item-size')
         const translatedSize = translatedRow.querySelector('.batch-preview-item-size')
         if (sourceSize) sourceSize.textContent = sizeText

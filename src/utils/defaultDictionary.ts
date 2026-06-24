@@ -6,13 +6,35 @@ export const defaultDictionary: Dictionary = {
   entries: {
     成分: {
       英文: 'Composition',
+      英语: 'Composition:',
       俄文: 'Состав',
+      俄语: 'Состав:',
+      印尼语: 'Komposisi:',
       阿语译文: 'المكونات',
     },
     成份: {
       英文: 'Composition',
+      英语: 'Composition:',
       俄文: 'Состав',
+      俄语: 'Состав:',
+      印尼语: 'Komposisi:',
       阿语译文: 'المكونات',
+    },
+    洗涤说明: {
+      英文: 'Washing instructions',
+      英语: 'Washing instructions:',
+      俄文: 'Инструкции по уходу',
+      俄语: 'Инструкции по уходу:',
+      印尼语: 'Petunjuk pencucian:',
+      阿语译文: 'تعليمات الغسيل',
+    },
+    温馨提示: {
+      英文: 'Warm tips',
+      英语: 'Warm tips:',
+      俄文: 'Полезные советы',
+      俄语: 'Полезные советы:',
+      印尼语: 'Tips:',
+      阿语译文: 'نصائح',
     },
     面料: {
       英文: 'Fabric',
@@ -31,7 +53,10 @@ export const defaultDictionary: Dictionary = {
     },
     中国制造: {
       英文: 'Made in China',
+      英语: 'Made in China',
       俄文: 'Сделано в Китае',
+      俄语: 'Сделано в Китае',
+      印尼语: 'Buatan China',
       阿语译文: 'صنع في الصين',
     },
     '本商品建议单独洗涤，如有轻微褪色属正常现象，为保持衣服色泽，衣服不宜久浸。': {

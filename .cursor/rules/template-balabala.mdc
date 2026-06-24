@@ -31,7 +31,7 @@ alwaysApply: false
 
 ## 修改时勿动
 
-- 本规范**仅适用于 `balabala` 模板**；迷你巴拉、bala-prem、羽绒等保持各自规则
+- 本规范**仅适用于 `balabala` 模板**；迷你巴拉、羽绒等保持各自规则
 - `careLayout: 'mini-centered'`、`arabicBlockBorder: 'none'` 属于迷你巴拉
 - 羽绒模板 `compositionMode: 'down-jacket'` 与充绒量表格
 

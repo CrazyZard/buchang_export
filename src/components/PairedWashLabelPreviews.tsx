@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import { ScaledLabelPreview } from './ScaledLabelPreview'
+import { useTemplate } from '../context/TemplateContext'
 import { formatLabelSizeMm, LABEL_WIDTH_MM, pxToMm, type PreviewLabelHeights } from '../utils/labelMeasure'
 
 interface PairedWashLabelPreviewsProps {
@@ -16,6 +17,8 @@ export function PairedWashLabelPreviews({
   translated,
   onHeightsChange,
 }: PairedWashLabelPreviewsProps) {
+  const template = useTemplate()
+  const labelWidth = template.layout.labelWidthMm ?? LABEL_WIDTH_MM
   const sourceSlotRef = useRef<HTMLDivElement>(null)
   const translatedSlotRef = useRef<HTMLDivElement>(null)
   const onHeightsChangeRef = useRef(onHeightsChange)
@@ -49,8 +52,8 @@ export function PairedWashLabelPreviews({
         pairedMm: pxToMm(maxPx),
       })
 
-      updateBadge(sourceSlotRef.current, sourceLabel.offsetHeight)
-      updateBadge(translatedSlotRef.current, translatedLabel.offsetHeight)
+      updateBadge(sourceSlotRef.current, sourceLabel.offsetHeight, labelWidth)
+      updateBadge(translatedSlotRef.current, translatedLabel.offsetHeight, labelWidth)
     }
 
     syncHeights()
@@ -84,9 +87,9 @@ export function PairedWashLabelPreviews({
   )
 }
 
-function updateBadge(slot: HTMLElement | null, heightPx: number) {
+function updateBadge(slot: HTMLElement | null, heightPx: number, labelWidthMm: number) {
   if (!slot || heightPx <= 0) return
   const badge = slot.querySelector('.preview-size-badge') as HTMLElement | null
   if (!badge) return
-  badge.textContent = formatLabelSizeMm(LABEL_WIDTH_MM, pxToMm(heightPx))
+  badge.textContent = formatLabelSizeMm(labelWidthMm, pxToMm(heightPx))
 }

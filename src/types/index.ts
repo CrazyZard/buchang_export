@@ -70,6 +70,7 @@ export type CareSymbolKey =
   | 'handWash'
   | 'doNotBleach'
   | 'lineDryShade'
+  | 'lineDryingInShade'
   | 'dripFlatDrying'
   | 'ironLowTemp'
   | 'doNotIron'

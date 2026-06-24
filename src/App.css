@@ -22,6 +22,14 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: 'MiSans-Regular';
+  src: url('/fonts/MiSans-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --bg: #f4f6f8;
   --surface: #ffffff;
@@ -337,6 +345,12 @@ body {
   white-space: pre-wrap;
 }
 
+.export-capture .lang-block.rtl .composition-plain,
+.export-capture .live-export-single-text.composition-plain[dir='rtl'] {
+  direction: rtl;
+  text-align: right;
+}
+
 .composition-plain-line {
   display: block;
 }
@@ -427,9 +441,9 @@ body {
 
 .workspace-grid {
   display: grid;
-  grid-template-columns: minmax(360px, 1fr) max-content max-content;
+  grid-template-columns: minmax(280px, 460px) minmax(200px, 300px) minmax(200px, 300px);
   grid-template-rows: auto 1fr;
-  gap: 12px 20px;
+  gap: 12px 16px;
   align-items: start;
 }
 
@@ -462,6 +476,8 @@ body {
   grid-column: 1;
   grid-row: 2;
   min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
   padding-right: 8px;
 }
 
@@ -472,8 +488,7 @@ body {
   align-items: center;
   gap: 6px;
   justify-content: flex-start;
-  width: max-content;
-  max-width: 100%;
+  min-width: 0;
 }
 
 .preview-size-badge {
@@ -494,6 +509,7 @@ body {
 .preview-scale-slot {
   position: relative;
   flex-shrink: 0;
+  max-width: 100%;
 }
 
 .preview-scale-inner {
@@ -520,8 +536,19 @@ body {
 .edit-section-label {
   font-size: 0.88rem;
   font-weight: 600;
+
   color: var(--primary);
   margin-bottom: 10px;
+}
+
+.logo-selector {
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
 }
 
 .footer-codes {
@@ -803,13 +830,11 @@ body {
 .care-symbols--sm .inline-svg-host svg {
   width: var(--label-care-symbol-size);
   height: var(--label-care-symbol-size);
-  max-width: var(--label-care-symbol-size);
-  max-height: var(--label-care-symbol-size);
 }
 
 .wash-label {
-  width: var(--label-width);
-  max-width: var(--label-width);
+  width: var(--label-width, 25mm);
+  max-width: var(--label-width, 25mm);
   padding: 0 1mm 1.2mm;
   border: 1px solid var(--primary);
   background: #fff;
@@ -876,6 +901,297 @@ body {
   min-height: 70mm;
 }
 
+/* ========= 森马常规（25×90mm）========= */
+
+.wash-label--senma-regular {
+  --font-zh: 'MiSans-Regular', 'FZ', 'SimSun', '宋体', serif;
+  --font-latin: 'MiSans-Regular', 'GO', sans-serif;
+}
+
+.wash-label--senma-regular.wash-label--source,
+.wash-label--senma-regular.wash-label--translated {
+  min-height: 90mm;
+}
+
+.wash-label--senma-regular.wash-label--source .composition-token,
+.wash-label--senma-regular.wash-label--source .composition-line,
+.wash-label--senma-regular.wash-label--source .composition-section-title,
+.wash-label--senma-regular.wash-label--source .composition-footnote,
+.wash-label--senma-regular.wash-label--source .composition-plain-line {
+  font-size: 1em;
+}
+
+.wash-label--senma-regular.wash-label--source .label-section--composition {
+  margin-top: 2em;
+}
+
+.wash-label--senma-regular.wash-label--translated .label-composition-care-spacer {
+  flex: 0 0 2em;
+  min-height: 2em;
+}
+
+/* 森马：温馨提示标签 */
+.wash-label--senma-regular.wash-label--source .label-source-advice--with-label {
+  display: flex;
+  flex-direction: column;
+}
+
+.wash-label--senma-regular.wash-label--source .label-source-advice-label {
+  margin-bottom: 0.15mm;
+}
+
+/* 森马翻译侧：洗涤说明纯文本置顶左对齐 */
+.wash-label--senma-regular.wash-label--translated .label-translated-wash-head--text-only {
+  text-align: left;
+}
+
+.wash-label--senma-regular.wash-label--translated .label-translated-wash-text {
+  font-size: 1em;
+  line-height: 1.15;
+}
+
+.wash-label--senma-regular.wash-label--translated .label-section--care {
+  margin-top: 1em;
+}
+
+.wash-label--senma-regular.wash-label--translated .product-codes.label-font-latin {
+  font-weight: 400;
+}
+
+.wash-label--senma-regular.wash-label--translated .composition-plain-line--hanging,
+.wash-label--senma-regular.wash-label--translated .composition-plain-line--continuation {
+  padding-inline-start: 0;
+  text-indent: 0;
+}
+
+/* ================================
+   森马羽绒 · 32×120mm
+   ================================ */
+.wash-label--senma-down {
+  --font-zh: 'MiSans-Regular', 'FZ', 'SimSun', '宋体', serif;
+  --font-latin: 'MiSans-Regular', 'GO', sans-serif;
+}
+
+.wash-label--senma-down.wash-label--source,
+.wash-label--senma-down.wash-label--translated {
+  min-height: 120mm;
+  width: 32mm;
+}
+
+.wash-label--senma-down.wash-label--source .composition-token,
+.wash-label--senma-down.wash-label--source .composition-line,
+.wash-label--senma-down.wash-label--source .composition-section-title,
+.wash-label--senma-down.wash-label--source .composition-footnote,
+.wash-label--senma-down.wash-label--source .composition-plain-line {
+  font-size: 1em;
+}
+
+.wash-label--senma-down.wash-label--source .label-section--composition {
+  margin-top: 2em;
+}
+
+.wash-label--senma-down.wash-label--translated .label-composition-care-spacer {
+  flex: 0 0 2em;
+  min-height: 2em;
+}
+
+/* 森马羽绒：温馨提示标签 */
+.wash-label--senma-down.wash-label--source .label-source-advice--with-label {
+  display: flex;
+  flex-direction: column;
+}
+
+.wash-label--senma-down.wash-label--source .label-source-advice-label {
+  margin-bottom: 0.15mm;
+}
+
+/* 森马羽绒翻译侧：洗涤说明纯文本置顶左对齐 */
+.wash-label--senma-down.wash-label--translated .label-translated-wash-head--text-only {
+  text-align: left;
+}
+
+.wash-label--senma-down.wash-label--translated .label-translated-wash-text {
+  font-size: 1em;
+  line-height: 1.15;
+}
+
+.wash-label--senma-down.wash-label--translated .label-section--care {
+  margin-top: 1em;
+}
+
+.wash-label--senma-down.wash-label--translated .product-codes.label-font-latin {
+  font-weight: 400;
+}
+
+.wash-label--senma-down.wash-label--translated .composition-plain-line--hanging,
+.wash-label--senma-down.wash-label--translated .composition-plain-line--continuation {
+  padding-inline-start: 0;
+  text-indent: 0;
+}
+
+/* 森马羽绒充绒量表格（32mm宽7列，绝对字号源/翻译一致） */
+.wash-label--senma-down .down-fill-grid-table,
+.wash-label--senma-down .down-fill-grid-cell {
+  font-size: 3.8pt;
+}
+.wash-label--senma-down.wash-label--translated .down-fill-grid-table,
+.wash-label--senma-down.wash-label--translated .down-fill-grid-cell {
+  font-size: 3.8pt;
+}
+.wash-label--senma-down .down-fill-grid-table {
+  line-height: 1.05;
+  table-layout: fixed;
+}
+
+.wash-label--senma-down .down-fill-grid-cell--size,
+.wash-label--senma-down .down-fill-grid-cell--weight {
+  text-align: left;
+}
+
+.wash-label--senma-down .down-fill-grid-cell--size {
+  line-height: 1.08;
+  padding: 0.1mm 0.05mm 0.1mm 0.3mm;
+}
+
+.wash-label--senma-down .down-fill-grid-cell--weight {
+  padding: 0.08mm 0 0.08mm 0.3mm;
+}
+
+.wash-label--senma-down .down-fill-grid-title,
+.wash-label--senma-down .down-fill-grid-title--split {
+  font-size: 5pt;
+}
+
+.wash-label--senma-down .label-section--down-jacket .down-fill-grid,
+.wash-label--senma-down .down-fill-grid--translated.down-fill-grid {
+  margin-top: 1.5mm;
+}
+
+/* ========= 青蛙羽绒（32×120mm 微软雅黑）========= */
+.wash-label--frog-down {
+  --font-zh: 'Microsoft YaHei', 'FZ', 'SimSun', '5b8b4f53', serif;
+  --font-latin: 'Microsoft YaHei', 'GO', sans-serif;
+}
+
+.wash-label--frog-down.wash-label--source,
+.wash-label--frog-down.wash-label--translated {
+  min-height: 75mm;
+  width: 30mm;
+}
+
+.wash-label--frog-down.wash-label--source .composition-token,
+.wash-label--frog-down.wash-label--source .composition-line,
+.wash-label--frog-down.wash-label--source .composition-section-title,
+.wash-label--frog-down.wash-label--source .composition-footnote,
+.wash-label--frog-down.wash-label--source .composition-plain-line {
+  font-size: 1em;
+}
+
+.wash-label--frog-down.wash-label--source .label-section--composition {
+  margin-top: 2em;
+}
+
+.wash-label--frog-down.wash-label--translated .label-composition-care-spacer {
+  flex: 0 0 2em;
+  min-height: 2em;
+}
+
+.wash-label--frog-down.wash-label--source .label-source-advice--with-label {
+  display: flex;
+  flex-direction: column;
+}
+
+.wash-label--frog-down.wash-label--source .label-source-advice-label {
+  margin-bottom: 0.15mm;
+  font-size: 5pt;
+}
+
+.wash-label--frog-down.wash-label--translated .label-translated-wash-head--text-only {
+  text-align: left;
+}
+
+.wash-label--frog-down.wash-label--translated .label-translated-wash-text {
+  font-size: 1em;
+  line-height: 1.15;
+}
+
+.wash-label--frog-down.wash-label--translated .label-section--care {
+  margin-top: 1em;
+}
+
+.wash-label--frog-down.wash-label--translated .product-codes.label-font-latin {
+  font-weight: 400;
+}
+
+.wash-label--frog-down.wash-label--translated .composition-plain-line--hanging,
+.wash-label--frog-down.wash-label--translated .composition-plain-line--continuation {
+  padding-inline-start: 0;
+  text-indent: 0;
+}
+
+.wash-label--frog-down .down-fill-grid-table,
+.wash-label--frog-down .down-fill-grid-cell {
+  font-size: 5.5pt;
+  font-family: 'SimHei', 'Microsoft YaHei', sans-serif;
+}
+.wash-label--frog-down.wash-label--translated .down-fill-grid-table,
+.wash-label--frog-down.wash-label--translated .down-fill-grid-cell {
+  font-size: 5.5pt;
+  font-family: 'SimHei', 'Microsoft YaHei', sans-serif;
+}
+.wash-label--frog-down .down-fill-grid-table {
+  line-height: 1.05;
+  width: 100%;
+  table-layout: auto;
+  margin: 0;
+}
+
+.wash-label--frog-down .down-fill-grid-cell--size,
+.wash-label--frog-down .down-fill-grid-cell--weight {
+  text-align: center;
+}
+
+.wash-label--frog-down .down-fill-grid-cell--size {
+  line-height: 1.08;
+  padding: 0.1mm 0.05mm;
+}
+
+.wash-label--frog-down .down-fill-grid-cell--weight {
+  padding: 0.08mm 0;
+}
+
+.wash-label--frog-down .down-fill-grid-title,
+.wash-label--frog-down .down-fill-grid-title--split {
+  font-size: 5pt;
+  text-align: left;
+  display: block;
+  justify-content: initial;
+}
+
+/* 青蛙羽绒：充绒量标题间距 */
+.wash-label--frog-down .down-fill-grid-title-main,
+.wash-label--frog-down .down-fill-grid-title-suffix {
+  display: inline;
+}
+
+.wash-label--frog-down .label-section--down-jacket .down-fill-grid,
+.wash-label--frog-down .down-fill-grid--translated.down-fill-grid {
+  margin-top: 1.5mm;
+}
+
+/* 青蛙羽绒：成分标题 7pt */
+.wash-label--frog-down.wash-label--source .composition-plain-line:first-of-type,
+.wash-label--frog-down.wash-label--translated .composition-plain-line:first-of-type {
+  font-size: 7pt;
+}
+
+/* 青蛙羽绒：洗涤维护方式 5pt */
+.wash-label--frog-down.wash-label--source .label-source-title {
+  font-size: 5pt;
+}
+
+/* ================================ */
+
 .wash-label--source .label-section--composition {
   font-size: 1em;
   flex: 0 0 auto;
@@ -907,6 +1223,14 @@ body {
 .label-zh,
 .composition-percent {
   font-family: var(--font-zh);
+}
+
+/* 阿语 RTL 行内 57.7%：数字+% 作 LTR 单元，避免显示成 %57.7 */
+.composition-digit-percent {
+  direction: ltr;
+  unicode-bidi: isolate;
+  display: inline;
+  white-space: nowrap;
 }
 
 /* 阿拉伯：ARIAL 4pt */
@@ -1000,6 +1324,7 @@ body {
 .wash-label--translated .label-box-footer,
 .wash-label--translated .box-cell-line,
 .wash-label--translated .down-fill-grid-title,
+.wash-label--translated .down-fill-grid-title--split,
 .wash-label--translated .down-fill-grid-table {
   font-size: 1em;
 }
@@ -1313,6 +1638,90 @@ body {
   --label-brand-logo-height: calc(var(--label-brand-logo-width) * 15.9 / 57.95);
 }
 
+/* ========= 青蛙（25×54mm 微软雅黑）========= */
+.wash-label--frog {
+  --label-head-seam: 8mm;
+  --label-brand-logo-width: calc(var(--label-width) * 0.9);
+  --label-brand-logo-height: calc(var(--label-brand-logo-width) * 7.66 / 63.28);
+  --font-zh: 'Microsoft YaHei', 'FZ', 'SimSun', '宋体', serif;
+  --font-latin: 'Microsoft YaHei', 'GO', sans-serif;
+}
+
+.wash-label--frog.wash-label--source,
+.wash-label--frog.wash-label--translated {
+  min-height: 54mm;
+  font-size: 5pt;
+}
+
+/* 青蛙：中文成分/洗涤/脚注/款号统一 5pt */
+.wash-label--frog.wash-label--source .label-section--care,
+.wash-label--frog.wash-label--source .label-footer {
+  font-size: 1em;
+}
+
+.wash-label--frog.wash-label--source .footer-made-in {
+  font-size: 1em;
+}
+
+/* 青蛙：款号/工厂代码不加粗 */
+.wash-label--frog.wash-label--source .product-codes.label-latin {
+  font-weight: 400;
+}
+
+.wash-label--frog.wash-label--translated .product-codes.label-font-latin {
+  font-weight: 400;
+}
+
+/* 青蛙：成分与洗涤说明之间至少空一行 */
+.wash-label--frog.wash-label--source .label-composition-care-spacer {
+  flex: 0 0 1em;
+  min-height: 1em;
+}
+
+.wash-label--frog.wash-label--translated .label-composition-care-spacer {
+  flex: 0 0 1em;
+  min-height: 1em;
+}
+
+.wash-label--frog.wash-label--source .label-section--care,
+.wash-label--frog.wash-label--source .label-section--composition + .label-section--care {
+  margin-top: 0;
+}
+
+.wash-label--frog.wash-label--translated .label-section--care {
+  margin-top: 0;
+}
+
+/* 青蛙：洗涤建议 pre-line 断行）
+.wash-label--frog.wash-label--source .label-source-advice {
+  white-space: pre-line;
+  text-align: left;
+}
+
+/* 青蛙：翻译区英文维护方法文本 */
+.wash-label--frog.wash-label--translated .label-translated-wash-title-frog {
+  font-size: 3.8pt;
+  line-height: 1.15;
+  margin-bottom: 0.3mm;
+}
+
+.wash-label--frog.wash-label--translated .label-translated-wash-body-frog {
+  font-size: 3.8pt;
+  line-height: 1.15;
+  white-space: pre-line;
+  text-align: left;
+}
+
+/* 青蛙：成分含量标题 5.2pt */
+.wash-label--frog .composition-plain-line:first-child {
+  font-size: calc(5.2 / 5 * 1em);
+}
+
+/* 青蛙：成分含量标题 5.2pt） */
+.wash-label--frog .composition-block--translated .composition-plain-line:first-child {
+  font-size: calc(5.2 / 5 * 1em);
+}
+
 .wash-label--balabala.wash-label--source .product-codes.label-latin {
   font-size: var(--size-product-code);
   font-weight: 400;
@@ -1439,6 +1848,21 @@ body {
   margin-bottom: 0.15mm;
 }
 
+.down-fill-grid-title--split {
+  display: flex;
+  justify-content: space-between;
+  text-align: left;
+}
+
+.down-fill-grid-title-main {
+  flex-shrink: 0;
+}
+
+.down-fill-grid-title-suffix {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .down-fill-grid-table {
   width: 100%;
   border-collapse: collapse;
@@ -1470,6 +1894,47 @@ body {
   margin-top: 6px;
 }
 
+.down-jacket-section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.down-jacket-line-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.down-jacket-line-row textarea {
+  flex: 1;
+  min-height: 36px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.82rem;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.btn-plus,
+.btn-minus {
+  border: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.btn-plus:hover,
+.btn-minus:hover {
+  background: #efefef;
+}
+
 .down-fill-grid-editor-head {
   display: flex;
   align-items: center;
@@ -1489,7 +1954,6 @@ body {
 .down-fill-grid-editor-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 480px;
 }
 
 .down-fill-grid-editor-table th,
@@ -1515,6 +1979,19 @@ body {
   border-radius: 4px;
   font-size: 0.85rem;
   text-align: center;
+}
+
+.down-fill-grid-editor-table textarea {
+  width: 100%;
+  min-width: 48px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.78rem;
+  text-align: center;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.2;
 }
 
 .down-fill-grid-remove {
@@ -1623,11 +2100,21 @@ body {
 
 /* 成分与洗涤说明之间至少空一行 */
 .wash-label--balabala.wash-label--source .label-composition-care-spacer {
-  flex: 1 1 0;
+  flex: 0 0 1em;
   min-height: 1em;
 }
 
 .wash-label--balabala.wash-label--translated .label-composition-care-spacer {
+  flex: 0 0 1em;
+  min-height: 1em;
+}
+
+.wash-label--senma-regular.wash-label--source .label-composition-care-spacer {
+  flex: 0 0 1em;
+  min-height: 1em;
+}
+
+.wash-label--senma-down.wash-label--source .label-composition-care-spacer {
   flex: 0 0 1em;
   min-height: 1em;
 }
@@ -1745,6 +2232,22 @@ body {
   word-break: normal;
 }
 
+/* 洗涤说明 + 工厂代码包裹，整体推到底部，底部留 2mm */
+.label-bottom-group {
+  margin-top: auto;
+  padding-bottom: 2mm;
+  flex-shrink: 0;
+}
+
+.label-bottom-group .label-section {
+  margin-top: 0;
+}
+
+/* 确保 label-bottom-group 内 care section 的 auto margin 被覆盖 */
+.wash-label--source .label-bottom-group .label-section--care {
+  margin-top: 0;
+}
+
 .label-footer {
   text-align: center;
 }
@@ -1753,9 +2256,28 @@ body {
   font-size: 1em;
 }
 
+.footer-made-in-translated {
+  text-align: center;
+  margin-bottom: 0.3mm;
+}
+
+.footer-made-in-translated .footer-made-in-line {
+  font-size: 1em;
+  line-height: 1.15;
+}
+
 .product-codes {
+  width: 100%;
+  text-align: center;
   margin-top: 0.3mm;
   line-height: 1.1;
+}
+
+/* 导出：款号/工厂代码两行 div 保持块级居中 */
+.export-capture .product-codes > div,
+.wash-label--export .product-codes > div {
+  display: block;
+  text-align: center;
 }
 
 .wash-label--translated .lang-block + .lang-block {

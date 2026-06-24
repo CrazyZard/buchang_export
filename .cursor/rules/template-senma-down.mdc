@@ -1,0 +1,46 @@
+---
+description: 森马羽绒模板维护规范
+globs: src/templates/index.ts,src/utils/labelDefaults.ts,src/components/WashLabelSections.tsx,src/components/WashLabelPreview.tsx,src/components/LabelWorkspace.tsx,src/App.css
+alwaysApply: false
+---
+
+# 森马羽绒 模板
+
+## 标识
+
+- `TemplateId`: `senma-down`
+- CSS 前缀: `.wash-label--senma-down`
+- 默认数据: `createSenmaDownLabelData()`
+
+## 规格
+
+- 尺寸: **32×120mm**
+- 缝头: 13mm
+- 字典: `src/assets/senma.xlsx`（列: 中文→英语→印尼语→俄语）
+- 品牌 Logo: 同森马常规（`semir.svg` / `semir_smrtech.svg`）
+- 成分模式: `down-jacket`（羽绒充绒量表格编辑）
+- 充绒量逻辑: 与 `bala-down` 一致（`createDefaultDownFillGrid()`）
+
+## 字体
+
+- 同森马常规：MiSans-Regular
+- `AutoFitLabel.tsx` 中 `LABEL_FONT.senmaDownChinese` 与 `LABEL_FONT.senmaTranslated`
+
+## 布局
+
+- 与森马常规一致（温馨提示、无干洗说明、翻译纯文字等）
+- 成分区用 `DownJacketEditor`（面层/底层/里料/充绒量表格），同时展示 `CompositionPasteInput`
+
+## 编辑器差异
+
+- 成分区: `DownJacketEditor` + `CompositionPasteInput`
+- 同森马常规: 无"干洗说明"，"温馨提示"标签
+
+## 与其他模板区别
+
+| 特性 | 森马常规 | 森马羽绒 |
+|------|----------|----------|
+| 尺寸 | 25×90mm | 32×120mm |
+| 成分模式 | standard | down-jacket |
+| 成分编辑 | MaterialEditor | DownJacketEditor |
+| 成分粘贴导入 | 有 | 有 |

@@ -11,6 +11,8 @@ const FLATTEN_SELECTORS = [
 ].join(',')
 
 function shouldFlattenElement(el: HTMLElement): boolean {
+  // 款号/工厂代码：保留两行 <div>，dom-to-svg 自然生成两个 <text>
+  if (el.classList.contains('product-codes')) return false
   if (
     el.classList.contains(LIVE_EXPORT_SINGLE_TEXT_CLASS) ||
     el.querySelector(`.${LIVE_EXPORT_SINGLE_TEXT_CLASS}`)
@@ -71,14 +73,6 @@ function flattenGenericToken(el: HTMLElement): void {
   el.textContent = normalizeFlattenedText(el.textContent ?? '')
 }
 
-/** 款号/工厂代码：保留两行（子 div 用换行拼接，避免 textContent 直接粘连） */
-function flattenProductCodes(el: HTMLElement): void {
-  const lines = [...el.children]
-    .map((child) => normalizeFlattenedText(child.textContent ?? ''))
-    .filter((line) => line.length > 0)
-  el.textContent = lines.join('\n')
-}
-
 function flattenCompositionToken(el: HTMLElement): void {
   if (el.closest('.rtl')) {
     flattenArabicToken(el)
@@ -117,11 +111,6 @@ export function flattenInlineTextSpans(root: HTMLElement): () => void {
 
     if (el.classList.contains('composition-token')) {
       flattenCompositionToken(el)
-      return
-    }
-
-    if (el.classList.contains('product-codes')) {
-      flattenProductCodes(el)
       return
     }
 

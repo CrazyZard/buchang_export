@@ -1,5 +1,4 @@
-import { ARABIC_RENDER_OPTIONS, splitRtlWeakTrailingPunct } from './arabicTextExport'
-import { toArabicVisualBaseString } from './arabicVisualOrder'
+import { ARABIC_RENDER_OPTIONS, coalesceDigitPercentRuns, isArabicExportText, splitRtlWeakTrailingPunct } from './arabicTextExport'
 import { svgFontFamilyForRole } from './pdfFontFamilies'
 import {
   isChineseCompositionDigitText,
@@ -12,6 +11,7 @@ import {
   toFzPercentGlyph,
 } from './textScriptDetect'
 import type { FontRole } from './svgTextToPathsUtils'
+import { LIVE_LABEL_RIGHT_PADDING_PX, LIVE_LABEL_TEXT_WIDTH_PX } from './exportTextLiveGeometry'
 import {
   measureAdvance,
   parseCoord,
@@ -39,6 +39,7 @@ export function appendLiveTspan(
   fill: string,
   role: FontRole,
   textAnchor: 'start' | 'end' = 'start',
+  runWidth?: number,
 ): number {
   if (!content) return 0
   const doc = textEl.ownerDocument
@@ -49,6 +50,9 @@ export function appendLiveTspan(
   tspan.setAttribute('y', String(y))
   if (textAnchor === 'end') {
     tspan.setAttribute('text-anchor', 'end')
+  }
+  if (runWidth !== undefined && Number.isFinite(runWidth) && runWidth > 0) {
+    tspan.setAttribute('data-ex-run-width', String(runWidth))
   }
   tspan.setAttribute('font-family', svgFontFamilyForRole(role))
   tspan.setAttribute('font-size', String(fontSize))
@@ -71,7 +75,10 @@ async function measureRunAdvance(
   fontSize: number,
 ): Promise<number> {
   const font = await resolveFontForRole(role)
-  if (!font) return 0
+  if (!font) {
+    const ratio = role === 'latin' ? 0.5 : role === 'arabic' ? 0.55 : 0.95
+    return content.length * fontSize * ratio
+  }
   return measureAdvance(font, content, fontSize, renderOptionsForRole(role))
 }
 
@@ -184,37 +191,65 @@ export async function appendBestLtrLiveTspans(
   return appendSplitLiveTspans(textEl, text, startX, y, fontSize, fill, defaultRole, false)
 }
 
-function arabicVisualCharRole(ch: string): FontRole {
-  if (ch === '%' || ch === '％' || ch === '\u066a' || ch === '\u202a') return 'zh'
-  if (/[0-9.\u0660-\u0669]/.test(ch)) return 'latin'
-  if (ch === ':' || ch === '：') return 'zh'
-  return 'arabic'
-}
-
-/** 混排阿语行（含数字/%） */
-export function isMixedArabicExportLine(text: string): boolean {
-  return /[0-9.]/.test(text) || text.includes('%')
-}
-
-function splitArabicVisualRuns(visual: string): Array<{ text: string; role: FontRole }> {
-  const runs: Array<{ text: string; role: FontRole }> = []
-  let current = ''
-  let currentRole: FontRole | null = null
-  for (const ch of visual) {
-    const role = arabicVisualCharRole(ch)
-    if (currentRole === role) {
-      current += ch
-    } else {
-      if (current && currentRole) runs.push({ text: current, role: currentRole })
-      current = ch
-      currentRole = role
-    }
+/** 可编辑 PDF：逻辑序基础字母；阿语交换括号（(↔)、（↔）），补偿 PDF 无 bidi 括号镜像 */
+function liveArabicGlyphText(text: string, role: FontRole): string {
+  if (role === 'zh') return toFzPercentGlyph(text)
+  if (role === 'arabic') {
+    return text.replace(/[()（）]/g, (ch) => {
+      if (ch === '(') return ')'
+      if (ch === ')') return '('
+      if (ch === '（') return '）'
+      return '（'
+    })
   }
-  if (current && currentRole) runs.push({ text: current, role: currentRole })
-  return runs
+  return text
 }
 
-/** 可编辑 PDF 阿语：bidi 视觉序 + LTR 逐段绘制（svg2pdf/AI 不认 direction=rtl，逻辑序会反字） */
+export function isArabicRtlExportContext(textEl: SVGTextElement): boolean {
+  if (textEl.closest('g.rtl, .rtl, g[dir="rtl"], [dir="rtl"]')) return true
+  const host = textEl.closest(
+    'g.composition-plain, .composition-plain, g.live-export-single-text.composition-plain, .live-export-single-text.composition-plain',
+  )
+  if (host?.getAttribute('dir') === 'rtl') return true
+  if (host && isArabicExportText(textEl.textContent ?? '')) return true
+  return false
+}
+
+/** 翻译区整块成分（composition-plain）：右缘贴 25mm，勿用 token 级 captured 宽度 */
+function usesArabicTranslationLabelWidth(textEl: SVGTextElement): boolean {
+  const host = textEl.closest(
+    'g.composition-plain, .composition-plain, g.live-export-single-text.composition-plain, .live-export-single-text.composition-plain',
+  )
+  if (!host) return false
+  if (host.getAttribute('dir') === 'rtl') return true
+  return isArabicExportText(textEl.textContent ?? '')
+}
+
+/** 阿语翻译区右对齐：贴 25mm 洗唛右缘（dom-to-svg 坐标约 94px） */
+export function resolveArabicLiveBoxBounds(
+  textEl: SVGTextElement,
+  leftX: number,
+  rightX: number,
+  lineLeftX?: number,
+): { leftX: number; rightX: number } {
+  const capturedLeft = parseCoord(textEl.getAttribute('data-ex-left'), leftX)
+  const capturedRight = parseCoord(textEl.getAttribute('data-ex-right'), rightX)
+  const lineLeft = lineLeftX ?? capturedLeft
+
+  if (!usesArabicTranslationLabelWidth(textEl)) {
+    const left = lineLeft
+    const right = capturedRight > left ? capturedRight : Math.max(rightX, left)
+    return { leftX: left, rightX: right }
+  }
+
+  // 翻译区整块成分：固定 [0, 25mm - 右padding]，扣除 1mm 右边距避免阿语贴边
+  return {
+    leftX: lineLeftX ?? 0,
+    rightX: LIVE_LABEL_TEXT_WIDTH_PX - LIVE_LABEL_RIGHT_PADDING_PX,
+  }
+}
+
+/** 可编辑 PDF 阿语：逻辑序呈现形 + 右锚 text-anchor=end（避免 ل 等字被左锚裁切） */
 export async function appendArabicLiveTspans(
   textEl: SVGTextElement,
   logical: string,
@@ -226,15 +261,32 @@ export async function appendArabicLiveTspans(
 ): Promise<number> {
   if (!logical) return 0
 
-  const visual = toArabicVisualBaseString(logical)
-  if (!visual) return 0
-
-  const runs = splitArabicVisualRuns(visual)
-  const measured: Array<{ text: string; role: FontRole; width: number }> = []
+  const segments = coalesceDigitPercentRuns(splitTextByFontRole(logical, 'arabic'))
+  const measured: Array<
+    | { kind: 'single'; content: string; role: FontRole; width: number }
+    | { kind: 'digit-percent'; digits: string; percent: string; width: number }
+  > = []
   let naturalTotal = 0
-  for (const run of runs) {
-    const width = await measureRunAdvance(run.role, run.text, fontSize)
-    measured.push({ ...run, width })
+
+  for (const segment of segments) {
+    if (segment.kind === 'digit-percent') {
+      const digitText = segment.digits
+      const percentText = liveArabicGlyphText(segment.percent, 'zh')
+      const width =
+        (await measureRunAdvance('latin', digitText, fontSize)) +
+        (await measureRunAdvance('zh', percentText, fontSize))
+      measured.push({
+        kind: 'digit-percent',
+        digits: digitText,
+        percent: percentText,
+        width,
+      })
+      naturalTotal += width
+      continue
+    }
+    const glyphText = liveArabicGlyphText(segment.content, segment.role)
+    const width = await measureRunAdvance(segment.role, glyphText, fontSize)
+    measured.push({ kind: 'single', content: glyphText, role: segment.role, width })
     naturalTotal += width
   }
   if (naturalTotal <= 0) return 0
@@ -242,14 +294,44 @@ export async function appendArabicLiveTspans(
   const boxWidth = rightX > leftX ? rightX - leftX : 0
   const maxWidth = boxWidth > 0 ? boxWidth : naturalTotal
   const scale = naturalTotal > maxWidth ? maxWidth / naturalTotal : 1
-  const drawWidth = naturalTotal * scale
-  let cursorX = rightX - drawWidth
 
-  for (const run of measured) {
-    appendLiveTspan(textEl, run.text, cursorX, y, fontSize, fill, run.role)
-    cursorX += run.width * scale
+  // 逻辑序 segments：首个 segment 应排在右缘（RTL 阅读先看到），勿倒序
+  let rightEdge = rightX
+  for (let i = 0; i < measured.length; i++) {
+    const item = measured[i]
+    const width = item.width * scale
+    const groupLeft = rightEdge - width
+
+    if (item.kind === 'digit-percent') {
+      const digitW = (await measureRunAdvance('latin', item.digits, fontSize)) * scale
+      appendLiveTspan(textEl, item.digits, groupLeft, y, fontSize, fill, 'latin', 'start')
+      appendLiveTspan(
+        textEl,
+        item.percent,
+        groupLeft + digitW,
+        y,
+        fontSize,
+        fill,
+        'zh',
+        'start',
+      )
+    } else {
+      appendLiveTspan(
+        textEl,
+        item.content,
+        rightEdge,
+        y,
+        fontSize,
+        fill,
+        item.role,
+        'end',
+        width,
+      )
+    }
+    rightEdge -= width
   }
-  return drawWidth
+
+  return naturalTotal * scale
 }
 
 /** @deprecated 使用 appendArabicLiveTspans */

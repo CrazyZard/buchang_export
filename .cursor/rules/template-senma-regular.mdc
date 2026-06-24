@@ -1,0 +1,82 @@
+---
+description: 森马常规模板维护规范
+globs: src/templates/index.ts,src/utils/labelDefaults.ts,src/components/WashLabelSections.tsx,src/components/WashLabelPreview.tsx,src/components/LabelWorkspace.tsx,src/App.css
+alwaysApply: false
+---
+
+# 森马常规 模板
+
+## 标识
+
+- `TemplateId`: `senma-regular`
+- CSS 前缀: `.wash-label--senma-regular`
+- 默认数据: `createSenmaRegularLabelData()`
+
+## 规格
+
+- 尺寸: **25×90mm**
+- 缝头: 13mm
+- 字典: `src/assets/senma.xlsx`（列: 中文→英语→印尼语→俄语）
+- 默认选语言: 英语、印尼语、俄语
+- 品牌 Logo: `src/assets/serma/semir.svg`（semir）与 `src/assets/serma/semir_smrtech.svg`（森马 Semir），下拉可切换
+- 成分部位: 面料/罗纹/里料/填充物（均为可选）
+
+## 字体
+
+| 内容 | 字体 |
+|------|------|
+| 中文预览 | `MiSans-Regular` 4.8pt  |
+| 翻译预览 | `MiSans-Regular` 4pt（min 3.1pt） |
+| PDF 导出中文/翻译 | MiSans-Regular 统一嵌入，zh/latin 双角色均映射到 MiSans |
+
+- `AutoFitLabel.tsx` 中定义 `LABEL_FONT.senmaChinese` 与 `LABEL_FONT.senmaTranslated`
+- CSS `--font-zh` / `--font-latin` 均设为 `'MiSans-Regular', 'FZ', ...`
+- PDF 导出: `pdfFontFamilies.ts` 注册 `PDF_FONT_MISANS`，`pdfFontEmbed.ts` 嵌入 `MiSans-Regular.ttf`
+
+## 中文预览布局
+
+1. 品牌 Logo（`showBrandLogo: true`，可在编辑器下拉切换）
+2. 成分区（面料/罗纹/里料/填充物）
+3. `label-composition-care-spacer`（空一行）
+4. 洗涤说明（标题"洗涤说明" + 洗护图标）
+5. 无"不可干洗"
+6. "温馨提示" 标签 + 洗涤建议文字
+7. `label-bottom-group` 置底：中国制造 + 款号 + 工厂代码
+
+## 翻译预览布局
+
+1. 成分区（按语种分块，每块: 成分标签 + 各部位翻译）
+2. 洗涤说明纯文本翻译（每语种一行，左对齐，无 SVG）
+3. 洗护图标
+4. `label-bottom-group` 置底：中国制造翻译（Made in China / Buatan China / Сделано в Китае）+ 款号 + 工厂代码
+
+## 编辑器差异
+
+- 无"干洗说明"输入栏
+- "洗涤建议" → "温馨提示"
+
+## 翻译
+
+- 成分标题、部位标签、材质名称均通过字典 `senma.xlsx` 翻译
+- 翻译渲染顺序 = 字典列序 → 英语→印尼语→俄语
+- `defaultDictionary.ts` 提供回退翻译: `成分`/`洗涤说明`/`温馨提示`/`中国制造`
+
+## 与其他模板区别
+
+| 特性 | 巴拉 | 森马常规 |
+|------|------|----------|
+| 尺寸 | 25×54mm | 25×90mm |
+| 缝头 | 8mm | 13mm |
+| 字体 | FZ 5pt / GO 4pt | MiSans 4.8pt / 4pt |
+| 干洗说明 | 显示 | 隐藏 |
+| 洗涤建议标签 | 无 | "温馨提示" |
+| 翻译洗涤区 | SVG 图形 | 纯文字 |
+| 翻译 footer | 款号 | 中国制造翻译 + 款号 |
+| 字典 | balabala.xlsx | senma.xlsx |
+
+## 修改注意事项
+
+- 用 `.wash-label--senma-regular` 限定 CSS，勿动巴拉样式
+- `WashLabelPreview.tsx` 中 `isSenma` 分支只影响森马
+- `SourceCareSection` / `TranslatedCareSection` 新增 prop 有默认值，不影响其他模板
+- 字体 MiSans-Regular.ttf 需放在 `public/fonts/` 下

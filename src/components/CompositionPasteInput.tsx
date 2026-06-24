@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 interface CompositionPasteInputProps {
   onApply: (text: string) => void
+  onClear?: () => void
 }
 
 const PLACEHOLDER = `主面料：
@@ -10,7 +11,7 @@ const PLACEHOLDER = `主面料：
 腰拼接面料：100%棉
 （配料除外）`
 
-export function CompositionPasteInput({ onApply }: CompositionPasteInputProps) {
+export function CompositionPasteInput({ onApply, onClear }: CompositionPasteInputProps) {
   const [text, setText] = useState('')
 
   const handleApply = () => {
@@ -34,7 +35,7 @@ export function CompositionPasteInput({ onApply }: CompositionPasteInputProps) {
         <button type="button" className="btn-secondary" onClick={handleApply}>
           解析并插入
         </button>
-        <button type="button" className="btn-link" onClick={() => setText('')}>
+        <button type="button" className="btn-link" onClick={() => { setText(''); onClear?.() }}>
           清空
         </button>
       </div>

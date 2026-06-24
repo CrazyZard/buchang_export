@@ -4,17 +4,22 @@ import {
   isCareAdviceLiveNode,
   isChineseCompositionDigitText,
   isChineseCompositionPartLine,
+  isProductCodesSvgBlock,
 } from './exportTextBlockKind'
 import {
   applyLiveDominantBaseline,
   expandLiveDisplayLines,
+  LIVE_LABEL_RIGHT_PADDING_PX,
   LIVE_LABEL_TEXT_WIDTH_PX,
   measureMixedWidth,
   normalizeLiveTextContent,
   readLiveLineYs,
+  resolveCenteredLineStartX,
+  resolveLiveWrapMaxWidth,
 } from './exportTextLiveGeometry'
 import {
   appendArabicLiveTspans,
+  resolveArabicLiveBoxBounds,
   appendBestLtrLiveTspans,
   appendLiveTspan,
   appendSplitLiveTspans,
@@ -44,6 +49,20 @@ function isCompositionPlainSvgBlock(textEl: SVGTextElement): boolean {
 
 function isCareAdviceLiveSvgBlock(textEl: SVGTextElement): boolean {
   return isCareAdviceLiveNode(textEl)
+}
+
+async function resolveLtrLineStartX(
+  textEl: SVGTextElement,
+  line: string,
+  fontSize: number,
+  role: FontRole,
+): Promise<number> {
+  const leftX = parseCoord(textEl.getAttribute('data-ex-left'), readTextStartX(textEl))
+  if (!isProductCodesSvgBlock(textEl)) return leftX
+
+  const rightX = parseCoord(textEl.getAttribute('data-ex-right'), leftX + LIVE_LABEL_TEXT_WIDTH_PX)
+  const lineWidth = await measureMixedWidth(line, fontSize, role)
+  return resolveCenteredLineStartX(leftX, rightX, lineWidth)
 }
 
 const MATERIAL_TOKEN_RE = /^[\d.]+%/
@@ -84,6 +103,30 @@ async function layoutCompositionPlainLines(
   }
 
   return result
+}
+
+/** 续行缩进后可用宽度变小，对仍超宽的材质续行二次折行 */
+async function reflowIndentedPlainLines(
+  layouts: CompositionPlainLineLayout[],
+  leftX: number,
+  fontSize: number,
+  defaultRole: FontRole,
+): Promise<{ lines: string[]; layouts: CompositionPlainLineLayout[] }> {
+  const lines: string[] = []
+  const nextLayouts: CompositionPlainLineLayout[] = []
+
+  for (const layout of layouts) {
+    const indent = layout.lineX - leftX
+    const lineMax =
+      indent > 0 ? LIVE_LABEL_TEXT_WIDTH_PX - indent : LIVE_LABEL_TEXT_WIDTH_PX
+    const subLines = await expandLiveDisplayLines([layout.text], lineMax, fontSize, defaultRole)
+    for (const sub of subLines) {
+      lines.push(sub)
+      nextLayouts.push({ text: sub, lineX: layout.lineX })
+    }
+  }
+
+  return { lines, layouts: nextLayouts }
 }
 
 /** dom-to-svg 的 tspan 仅作几何参考；live 导出统一用 textContent，不走走转曲分行 */
@@ -146,10 +189,11 @@ async function renderPlainLiveText(
   fontSize: number,
   fill: string,
   draw: (text: string, x: number, y: number) => Promise<number>,
+  defaultRole: FontRole = 'latin',
 ): Promise<boolean> {
   const content = textEl.textContent ?? ''
   if (!content.trim()) return false
-  const startX = parseCoord(textEl.getAttribute('data-ex-left'), readTextStartX(textEl))
+  const startX = await resolveLtrLineStartX(textEl, content, fontSize, defaultRole)
   const y = readTextAnchorY(textEl)
   applyLiveDominantBaseline(textEl)
   return renderLineLive(textEl, content, startX, y, fontSize, fill, draw)
@@ -162,29 +206,34 @@ async function renderCompositionSingleLive(
   fill: string,
   defaultRole: FontRole,
 ): Promise<boolean> {
-  const leftX = parseCoord(textEl.getAttribute('data-ex-left'), readTextStartX(textEl))
-  const rightX = parseCoord(textEl.getAttribute('data-ex-right'), leftX)
+  const rawLeftX = parseCoord(textEl.getAttribute('data-ex-left'), readTextStartX(textEl))
+  const rawRightX = parseCoord(textEl.getAttribute('data-ex-right'), rawLeftX)
+  const { leftX, rightX } = resolveArabicLiveBoxBounds(textEl, rawLeftX, rawRightX)
   const isPlainComposition = isCompositionPlainSvgBlock(textEl)
   const isCareAdvice = isCareAdviceLiveSvgBlock(textEl)
 
   const rawLines = splitLiveLines(textEl.textContent ?? '')
   if (!rawLines.length) return false
 
-  let lines: string[]
-  if (isPlainComposition) {
-    lines = rawLines
-  } else {
-    let maxWidth = rightX > leftX ? rightX - leftX : 0
-    if (maxWidth <= 0 || isCareAdvice) maxWidth = LIVE_LABEL_TEXT_WIDTH_PX
-    lines = await expandLiveDisplayLines(rawLines, maxWidth, fontSize, defaultRole)
-  }
+  const maxWidth = resolveLiveWrapMaxWidth(leftX, rightX, {
+    isPlainComposition,
+    isCareAdvice,
+  })
+  let lines = await expandLiveDisplayLines(rawLines, maxWidth, fontSize, defaultRole)
 
   if (!lines.length) return false
 
-  const lineYs = readLiveLineYs(textEl, lines.length)
-  const plainLayouts = isPlainComposition
+  let plainLayouts = isPlainComposition
     ? await layoutCompositionPlainLines(lines, leftX, fontSize, defaultRole)
     : null
+
+  if (plainLayouts) {
+    const reflowed = await reflowIndentedPlainLines(plainLayouts, leftX, fontSize, defaultRole)
+    lines = reflowed.lines
+    plainLayouts = reflowed.layouts
+  }
+
+  const lineYs = readLiveLineYs(textEl, lines.length)
 
   clearSvgTextChildren(textEl)
   textEl.removeAttribute('style')
@@ -202,7 +251,17 @@ async function renderCompositionSingleLive(
     const availLeft = plainLayouts?.[i]?.lineX ?? leftX
 
     if (isArabicExportText(line)) {
-      await appendArabicLiveTspans(textEl, line, availLeft, rightX, lineY, fontSize, fill)
+      // 阿语多行：续行不应受 plainLayouts 缩进影响（LTR 的 indentPx 对 RTL 无意义），统一用 leftX
+      const lineBounds = resolveArabicLiveBoxBounds(textEl, leftX, rightX, leftX)
+      await appendArabicLiveTspans(
+        textEl,
+        line,
+        lineBounds.leftX,
+        lineBounds.rightX,
+        lineY,
+        fontSize,
+        fill,
+      )
       continue
     }
 
@@ -272,8 +331,14 @@ async function renderArabicRtlLive(
   const lines = splitLiveLines(textEl.textContent ?? '')
   if (!lines.length) return false
 
-  const leftX = parseCoord(textEl.getAttribute('data-ex-left'), readTextStartX(textEl))
-  const rightX = parseCoord(textEl.getAttribute('data-ex-right'), leftX)
+  const rawLeftX = parseCoord(textEl.getAttribute('data-ex-left'), readTextStartX(textEl))
+  const rawRightX = parseCoord(textEl.getAttribute('data-ex-right'), rawLeftX)
+  const { leftX, rightX: capturedRightX } = resolveArabicLiveBoxBounds(textEl, rawLeftX, rawRightX)
+  // 阿语标题 / 洗涤说明等：统一右对齐到标签右边界（与成分内容一致），扣除 1mm 右边距
+  const rightX = Math.max(
+    capturedRightX,
+    LIVE_LABEL_TEXT_WIDTH_PX - LIVE_LABEL_RIGHT_PADDING_PX,
+  )
   const lineYs = readLiveLineYs(textEl, lines.length)
 
   clearSvgTextChildren(textEl)
@@ -301,12 +366,15 @@ async function renderGenericLtrLive(
 ): Promise<boolean> {
   const lines = splitLiveLines(textEl.textContent ?? '')
   if (lines.length <= 1) {
-    return renderPlainLiveText(textEl, fontSize, fill, (text, x, y) =>
-      appendBestLtrLiveTspans(textEl, text, x, y, fontSize, fill, defaultRole),
+    return renderPlainLiveText(
+      textEl,
+      fontSize,
+      fill,
+      (text, x, y) => appendBestLtrLiveTspans(textEl, text, x, y, fontSize, fill, defaultRole),
+      defaultRole,
     )
   }
 
-  const startX = parseCoord(textEl.getAttribute('data-ex-left'), readTextStartX(textEl))
   const lineYs = readLiveLineYs(textEl, lines.length)
 
   clearSvgTextChildren(textEl)
@@ -320,6 +388,7 @@ async function renderGenericLtrLive(
 
   for (let i = 0; i < lines.length; i += 1) {
     const lineY = lineYs[i] ?? lineYs[0]
+    const startX = await resolveLtrLineStartX(textEl, lines[i], fontSize, defaultRole)
     await appendBestLtrLiveTspans(textEl, lines[i], startX, lineY, fontSize, fill, defaultRole)
   }
 

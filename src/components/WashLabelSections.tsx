@@ -11,7 +11,7 @@ import {
   buildSourceCompositionPlainLines,
   buildTranslatedCompositionPlainLines,
 } from '../utils/compositionPlainText'
-import { translateCompositionLabel } from '../utils/compositionFormat'
+import { translateCompositionLabel, translateKeyValueLine } from '../utils/compositionFormat'
 import { CareSymbols } from './CareSymbols'
 import { InlineSvg } from './InlineSvg'
 import { TRANSLATED_LABEL_GRAPHICS } from '../assets/care-symbols'
@@ -52,16 +52,40 @@ export function SourceDownJacketSection({
   data,
 }: Pick<SectionProps, 'data'>) {
   const downJacket = data.downJacket
+  const template = useTemplate()
   if (!downJacket) return null
 
-  const plainLines = [
-    { text: FIXED_LABELS.composition },
-    ...buildDownJacketCompositionPlainLines([
-      { partLabel: `${DOWN_JACKET_LABELS.facing}：`, lines: downJacket.facingLines },
-      { partLabel: `${DOWN_JACKET_LABELS.lining}：`, lines: [downJacket.liningLine] },
-      { partLabel: `${DOWN_JACKET_LABELS.stuffing}：`, lines: downJacket.stuffingLines },
-    ]),
-  ]
+  const isSenmaDown = template.id === 'senma-down'
+  const isFrogDown = template.id === 'frog-down'
+
+  const plainLines = isFrogDown
+    ? [
+        { text: '成分含量' },
+        ...downJacket.facingLines
+          .filter((l) => l.trim())
+          .map((l) => ({ text: l })),
+        ...downJacket.stuffingLines
+          .filter((l) => l.trim())
+          .map((l) => ({ text: l })),
+      ]
+    : isSenmaDown
+      ? [
+          { text: FIXED_LABELS.composition },
+          ...downJacket.facingLines
+            .filter((l) => l.trim())
+            .map((l) => ({ text: l })),
+          ...downJacket.stuffingLines
+            .filter((l) => l.trim())
+            .map((l) => ({ text: l })),
+        ]
+      : [
+        { text: FIXED_LABELS.composition },
+        ...buildDownJacketCompositionPlainLines([
+          { partLabel: `${DOWN_JACKET_LABELS.facing}：`, lines: downJacket.facingLines },
+          { partLabel: `${DOWN_JACKET_LABELS.lining}：`, lines: [downJacket.liningLine] },
+          { partLabel: `${DOWN_JACKET_LABELS.stuffing}：`, lines: downJacket.stuffingLines },
+        ]),
+      ]
 
   return (
     <div className="label-section label-section--composition label-section--down-jacket">
@@ -78,25 +102,38 @@ export function TranslatedDownJacketCompositionSection({ data, dictionary, langu
   const template = useTemplate()
   if (!downJacket || languages.length === 0) return null
 
+  const isSenmaDown = template.id === 'senma-down'
+  const isFrogDown = template.id === 'frog-down'
+
   return (
     <>
       {languages.map((lang) => {
-        const bodyLines = buildDownJacketCompositionPlainLines([
-          {
-            partLabel: `${translateCompositionLabel(dictionary, DOWN_JACKET_LABELS.facing, lang)}:`,
-            lines: downJacket.facingLines.map((line) => translateText(dictionary, line, lang)),
-          },
-          {
-            partLabel: `${translateCompositionLabel(dictionary, DOWN_JACKET_LABELS.lining, lang)}:`,
-            lines: [translateText(dictionary, downJacket.liningLine, lang)],
-          },
-          {
-            partLabel: `${translateCompositionLabel(dictionary, DOWN_JACKET_LABELS.stuffing, lang)}:`,
-            lines: downJacket.stuffingLines.map((line) => translateText(dictionary, line, lang)),
-          },
-        ])
+        const bodyLines = (isSenmaDown || isFrogDown)
+          ? [
+              // 森马羽绒翻译侧：按 "key：value" 拆分后分别翻译
+              ...downJacket.facingLines
+                .filter((l) => l.trim())
+                .map((line) => ({ text: translateKeyValueLine(dictionary, line, lang) })),
+              ...downJacket.stuffingLines
+                .filter((l) => l.trim())
+                .map((line) => ({ text: translateKeyValueLine(dictionary, line, lang) })),
+            ]
+          : buildDownJacketCompositionPlainLines([
+              {
+                partLabel: `${translateCompositionLabel(dictionary, DOWN_JACKET_LABELS.facing, lang)}:`,
+                lines: downJacket.facingLines.map((line) => translateText(dictionary, line, lang)),
+              },
+              {
+                partLabel: `${translateCompositionLabel(dictionary, DOWN_JACKET_LABELS.lining, lang)}:`,
+                lines: [translateText(dictionary, downJacket.liningLine, lang)],
+              },
+              {
+                partLabel: `${translateCompositionLabel(dictionary, DOWN_JACKET_LABELS.stuffing, lang)}:`,
+                lines: downJacket.stuffingLines.map((line) => translateText(dictionary, line, lang)),
+              },
+            ])
         const plainLines = [
-          { text: translateCompositionLabel(dictionary, FIXED_LABELS.composition, lang) },
+          { text: isFrogDown ? 'Composition content:' : translateCompositionLabel(dictionary, FIXED_LABELS.composition, lang) },
           ...bodyLines,
         ]
         const rtl = isRtlLanguage(lang)
@@ -124,7 +161,34 @@ export function TranslatedDownJacketCompositionSection({ data, dictionary, langu
       })}
       <DownFillGridPreview
         grid={downJacket.fillGrid}
-        title={translateText(dictionary, downJacket.fillGrid.title, languages[0])}
+        title={
+          isFrogDown
+            ? (() => {
+                const raw = downJacket.fillGrid.title
+                const parenIdx = raw.indexOf('(')
+                if (parenIdx <= 0) return translateText(dictionary, raw, languages[0])
+                const main = raw.slice(0, parenIdx).trimEnd() // "充绒量："
+                const suffix = raw.slice(parenIdx)             // "(单位：克)"
+                return (
+                  translateCompositionLabel(dictionary, main.replace(/[：:]$/, ''), languages[0]) +
+                  translateText(dictionary, suffix, languages[0])
+                )
+              })()
+            : isSenmaDown
+              ? (() => {
+                  const raw = downJacket.fillGrid.title
+                  const parenIdx = raw.indexOf('(')
+                  if (parenIdx <= 0) return translateText(dictionary, raw, languages[0])
+                  const main = raw.slice(0, parenIdx).trimEnd() // "充绒量："
+                  const suffix = raw.slice(parenIdx)             // "(单位：克)"
+                  return (
+                    translateCompositionLabel(dictionary, main.replace(/[：:]$/, ''), languages[0]) +
+                    ' ' +
+                    translateText(dictionary, suffix, languages[0])
+                  )
+                })()
+              : translateText(dictionary, downJacket.fillGrid.title, languages[0])
+        }
         className="down-fill-grid--translated"
       />
     </>
@@ -146,7 +210,12 @@ export function SourceCompositionSection({
   )
 }
 
-export function SourceCareSection({ data }: Pick<SectionProps, 'data'>) {
+export function SourceCareSection({
+  data,
+  skipDryCleanNote = false,
+  adviceLabel,
+  sourceWashTitle,
+}: Pick<SectionProps, 'data'> & { skipDryCleanNote?: boolean; adviceLabel?: string; sourceWashTitle?: string }) {
   const template = useTemplate()
   const careSymbols = resolveCareSymbols(data)
   const isMiniCentered = template.layout.careLayout === 'mini-centered'
@@ -156,9 +225,9 @@ export function SourceCareSection({ data }: Pick<SectionProps, 'data'>) {
     <div
       className={`label-section label-section--care ${isMiniCentered ? 'label-section--care-mini' : ''}`}
     >
-      <div className="label-source-title">{FIXED_LABELS.washingInstructions}</div>
+      <div className="label-source-title">{sourceWashTitle ?? FIXED_LABELS.washingInstructions}</div>
       <CareSymbols symbols={careSymbols} size="sm" />
-      <div className="label-source-emphasis">{data.dryCleanNote}</div>
+      {!skipDryCleanNote ? <div className="label-source-emphasis">{data.dryCleanNote}</div> : null}
       {isMiniCentered ? (
         <div className="label-source-advice-lines">
           {adviceLines.map((line, index) => (
@@ -168,7 +237,8 @@ export function SourceCareSection({ data }: Pick<SectionProps, 'data'>) {
           ))}
         </div>
       ) : (
-        <div className="label-source-advice">
+        <div className={`label-source-advice${adviceLabel ? ' label-source-advice--with-label' : ''}`}>
+          {adviceLabel ? <div className="label-source-advice-label">{adviceLabel}</div> : null}
           <CareAdvicePlainBlock text={data.careAdvice} />
         </div>
       )}
@@ -186,12 +256,23 @@ export function SourceCareSection({ data }: Pick<SectionProps, 'data'>) {
 }
 
 export function SourceFooterSection({ data }: Pick<SectionProps, 'data'>) {
+  const template = useTemplate()
+  const isFrog = template.id === 'frog'
   return (
     <div className="label-footer">
       <div className="footer-made-in">{data.madeIn}</div>
       <div className="product-codes label-latin">
-        <div>{data.productCode1}</div>
-        <div>{data.productCode2}</div>
+        {isFrog ? (
+          <>
+            <div>{data.productCode2}</div>
+            <div>{data.productCode1}</div>
+          </>
+        ) : (
+          <>
+            <div>{data.productCode1}</div>
+            <div>{data.productCode2}</div>
+          </>
+        )}
       </div>
     </div>
   )
@@ -241,10 +322,33 @@ export function TranslatedCompositionSection({
   )
 }
 
-export function TranslatedCareSection({ data, languages }: Pick<SectionProps, 'data' | 'languages'>) {
-  if (languages.length === 0) return null
-
+export function TranslatedCareSection({
+  data,
+  languages,
+  useTextOnly = false,
+  dictionary,
+}: Pick<SectionProps, 'data' | 'languages'> & { useTextOnly?: boolean; dictionary?: Dictionary }) {
   const careSymbols = resolveCareSymbols(data)
+
+  if (useTextOnly && dictionary && languages.length > 0) {
+    return (
+      <div className="label-section label-section--care">
+        <div className="label-translated-wash-head label-translated-wash-head--text-only">
+          {languages.map((lang) => {
+            const translated = dictionary.entries['洗涤说明']?.[lang] ?? translateText(dictionary, '洗涤说明', lang)
+            return (
+              <div key={lang} className={`label-translated-wash-text ${langClass(lang)}`}>
+                {translated}
+              </div>
+            )
+          })}
+        </div>
+        <CareSymbols symbols={careSymbols} size="sm" />
+      </div>
+    )
+  }
+
+  if (languages.length === 0) return null
 
   return (
     <>
@@ -273,12 +377,37 @@ export function TranslatedCareSection({ data, languages }: Pick<SectionProps, 'd
   )
 }
 
-export function TranslatedFooterSection({ data }: Pick<SectionProps, 'data'>) {
+export function TranslatedFooterSection({ data, dictionary, languages }: SectionProps) {
+  const template = useTemplate()
+  const isSenma = template.id === 'senma-regular' || template.id === 'senma-down' || template.id === 'frog-down'
+  const isFrog = template.id === 'frog'
+
   return (
     <div className="label-footer">
+      {(isSenma || isFrog) && languages.length > 0 ? (
+        <div className="footer-made-in-translated">
+          {languages.map((lang) => {
+            const translated = dictionary.entries['中国制造']?.[lang] ?? translateText(dictionary, '中国制造', lang)
+            return (
+              <div key={lang} className={`footer-made-in-line ${getLanguageFontClass(lang)}`}>
+                {translated}
+              </div>
+            )
+          })}
+        </div>
+      ) : null}
       <div className="product-codes label-font-latin">
-        <div>{data.productCode1}</div>
-        <div>{data.productCode2}</div>
+        {isFrog ? (
+          <>
+            <div>{data.productCode2}</div>
+            <div>{data.productCode1}</div>
+          </>
+        ) : (
+          <>
+            <div>{data.productCode1}</div>
+            <div>{data.productCode2}</div>
+          </>
+        )}
       </div>
     </div>
   )

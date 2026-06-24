@@ -1,6 +1,7 @@
 export const CJK_RE = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/
 export const CJK_PUNCT_RE = /[\u3000-\u303f\uff00-\uffef]/
 export const ARABIC_RE = /[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff]/
+export const ARABIC_PRESENTATION_RE = /[\ufb50-\ufdff\ufe70-\ufeff]/
 export const CYRILLIC_RE = /[\u0400-\u04ff]/
 
 export type TextFontRole = 'zh' | 'latin' | 'arabic'
@@ -26,11 +27,11 @@ function resolveCharFontRole(
   _textHasArabic: boolean,
   fallback: TextFontRole,
 ): TextFontRole {
-  if (ARABIC_RE.test(char)) return 'arabic'
-  if (needsZhFont(char, textHasCjk)) return 'zh'
-  // 数字 / % 全局铁律：GO / FZ（阿语行内亦同）
-  if (char === '%' || char === '％') return 'zh'
-  if (/[\d.]/.test(char)) return 'latin'
+    if (ARABIC_RE.test(char) || ARABIC_PRESENTATION_RE.test(char)) return 'arabic'
+    // 数字和小数点必须在 needsZhFont 之前判定，避免 CJK 上下文把 . 误判为 zh 导致 0.3 被拆成 0+.+3
+    if (/[\d.]/.test(char)) return 'latin'
+    if (char === '%' || char === '％') return 'zh'
+    if (needsZhFont(char, textHasCjk)) return 'zh'
   if (CYRILLIC_RE.test(char)) return 'latin'
   if (/[a-zA-Z]/.test(char)) return 'latin'
   return fallback
@@ -45,7 +46,9 @@ export function splitTextByFontRole(
 
   const chars = [...text]
   const textHasCjk = chars.some((char) => CJK_RE.test(char) || CJK_PUNCT_RE.test(char))
-  const textHasArabic = chars.some((char) => ARABIC_RE.test(char))
+  const textHasArabic = chars.some(
+    (char) => ARABIC_RE.test(char) || ARABIC_PRESENTATION_RE.test(char),
+  )
 
   const runs: Array<{ content: string; role: TextFontRole }> = []
   let current = ''
@@ -76,4 +79,18 @@ export function splitTextByFontRole(
 
 export function textContainsCjkOrPunct(text: string): boolean {
   return CJK_RE.test(text) || CJK_PUNCT_RE.test(text)
+}
+
+/** 阿语 RTL 行内：数字段后紧跟 %，须作为 LTR 单元（否则预览/导出会变成 %57.7） */
+export function isDigitThenPercentPair(
+  run: { content: string; role: TextFontRole },
+  next: { content: string; role: TextFontRole } | undefined,
+): boolean {
+  return (
+    run.role === 'latin' &&
+    /^[\d.]+$/.test(run.content) &&
+    next !== undefined &&
+    next.role === 'zh' &&
+    (next.content === '%' || next.content === '％')
+  )
 }

@@ -29,7 +29,7 @@ export function AutoFitLabel({
 }: AutoFitLabelProps) {
   const ref = useRef<HTMLDivElement>(null)
   const [fontSize, setFontSize] = useState(baseFontPt)
-  const heightLimitMm = forExport ? undefined : (maxHeightMm ?? DEFAULT_MAX_BODY_HEIGHT_MM)
+  const heightLimitMm = maxHeightMm ?? DEFAULT_MAX_BODY_HEIGHT_MM
 
   useLayoutEffect(() => {
     const element = ref.current
@@ -79,9 +79,23 @@ export function AutoFitLabel({
 export const LABEL_FONT = {
   /** 中文预览基准字号（成分区 4.5pt；洗涤区在 CSS 中放大至 5pt） */
   chinese: { basePt: 4.5, minPt: 3.5 },
-  /** 巴拉中文：全文 5pt，不随内容缩字 */
-  balabalaChinese: { basePt: 5, minPt: 5 },
-  /** 翻译预览基准字号 4pt */
-  latin: { basePt: 4, minPt: 3 },
-  arabic: { basePt: 4, minPt: 3 },
+  /** 巴拉中文：全文 5pt，可缩至 4pt */
+  balabalaChinese: { basePt: 5, minPt: 4 },
+  /** 森马中文：全文 5pt（不自动缩小） */
+  senmaChinese: { basePt: 5, minPt: 5 },
+  /** 森马羽绒中文：全文 4.8pt（不自动缩小） */
+  senmaDownChinese: { basePt: 4.8, minPt: 4.8 },
+  /** 青蛙中文：全文 5pt（不自动缩小），成分含量标题 5.2pt（CSS） */
+  frogChinese: { basePt: 5, minPt: 5 },
+  /** 青蛙羽绒中文：全文 4.8pt（不自动缩小） */
+  frogDownChinese: { basePt: 4.8, minPt: 4.8 },
+  /** 青蛙翻译：全文 5pt（不自动缩小），Composition content 标题 5.2pt（CSS） */
+  frogTranslated: { basePt: 5, minPt: 5 },
+  /** 青蛙羽绒翻译：全文 3.9pt */
+  frogDownTranslated: { basePt: 3.9, minPt: 3.1 },
+  /** 翻译预览基准字号 4pt，最低缩至 3.1pt */
+  latin: { basePt: 4, minPt: 3.1 },
+  /** 森马翻译：4pt */
+  senmaTranslated: { basePt: 4, minPt: 3.1 },
+  arabic: { basePt: 4, minPt: 3.1 },
 } as const

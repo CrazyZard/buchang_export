@@ -100,7 +100,12 @@ export function buildTranslatedCompositionPlainLines({
   const wrapChars = resolveTranslatedCompositionWrapChars(lang, baseWrapChars)
 
   const rows: CompositionPlainLine[] = [
-    { text: translateCompositionLabel(dictionary, FIXED_LABELS.composition, lang) },
+    {
+      text:
+        template.id === 'frog'
+          ? 'Composition content:'
+          : translateCompositionLabel(dictionary, FIXED_LABELS.composition, lang),
+    },
   ]
 
   if (extended?.sectionTitle) {
@@ -194,7 +199,9 @@ export function buildSourceCompositionPlainLines({
   const fabricExtended = getExtendedLinesForPart(extended, 'fabric')
   const skipFabric = fabricExtended.length > 0
 
-  const rows: CompositionPlainLine[] = [{ text: FIXED_LABELS.composition }]
+  const rows: CompositionPlainLine[] = [
+    { text: template.id === 'frog' ? '成分含量' : FIXED_LABELS.composition },
+  ]
 
   if (extended?.sectionTitle) {
     rows.push({ text: `${extended.sectionTitle}：` })

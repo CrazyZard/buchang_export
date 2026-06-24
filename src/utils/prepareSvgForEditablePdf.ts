@@ -1,5 +1,5 @@
 import type { FontRole } from './svgTextToPathsUtils'
-import { splitTextByFontRole, toFzPercentGlyph } from './textScriptDetect'
+import { splitTextByFontRole, toFzPercentGlyph, ARABIC_PRESENTATION_RE } from './textScriptDetect'
 import { isArabicExportText } from './arabicTextExport'
 import { isCareAdviceLiveNode } from './exportTextBlockKind'
 import {
@@ -52,6 +52,7 @@ function resolveRoleForExport(text: string, fallbackRole: FontRole): FontRole {
   if (!trimmed) return fallbackRole
   if (trimmed === '%' || trimmed === '％') return 'zh'
   if (/^[\d.]+$/.test(trimmed)) return 'latin'
+  if (ARABIC_PRESENTATION_RE.test(trimmed)) return 'arabic'
   const runs = splitTextByFontRole(text, fallbackRole)
   if (runs.length === 1) return runs[0].role
   return runs[0].role
@@ -79,6 +80,7 @@ function splitMixedRoleTspans(textEl: SVGTextElement, contentFallback: string): 
     const runs = splitTextByFontRole(text, fallback)
     if (runs.length <= 1) continue
 
+    const parentFamily = textEl.getAttribute('font-family') || ''
     const x = parseFloat(tspan.getAttribute('x') || textEl.getAttribute('x') || '0')
     const y = tspan.getAttribute('y') || textEl.getAttribute('y')
     const fontSize = parseFloat(
@@ -99,7 +101,7 @@ function splitMixedRoleTspans(textEl: SVGTextElement, contentFallback: string): 
       el.setAttribute('font-size', String(fontSize))
       el.setAttribute('fill', fill)
       el.setAttribute('dominant-baseline', baseline)
-      el.setAttribute('font-family', svgFontFamilyForRole(run.role))
+      el.setAttribute('font-family', svgFontFamilyForRole(run.role, parentFamily))
       textEl.insertBefore(el, insertBefore)
       cursorX += estimateRunWidth(
         run.role === 'zh' ? toFzPercentGlyph(run.content) : run.content,
@@ -129,6 +131,7 @@ function splitPlainMixedTextElement(textEl: SVGTextElement): void {
   const fontSize = parseFloat(textEl.getAttribute('font-size') || '12')
   const fill = textEl.getAttribute('fill') || '#000000'
 
+  const parentFamily = textEl.getAttribute('font-family') || ''
   textEl.textContent = ''
   textEl.removeAttribute('font-family')
 
@@ -141,7 +144,7 @@ function splitPlainMixedTextElement(textEl: SVGTextElement): void {
     el.setAttribute('font-size', String(fontSize))
     el.setAttribute('fill', fill)
     el.setAttribute('dominant-baseline', 'text-after-edge')
-    el.setAttribute('font-family', svgFontFamilyForRole(run.role))
+    el.setAttribute('font-family', svgFontFamilyForRole(run.role, parentFamily))
     textEl.appendChild(el)
     cursorX += estimateRunWidth(
       run.role === 'zh' ? toFzPercentGlyph(run.content) : run.content,
@@ -253,6 +256,66 @@ function finalizeZhTspanGlyph(tspan: Element, role: FontRole, rawText: string): 
   tspan.textContent = toFzPercentGlyph(rawText)
 }
 
+function hasArabicEndAnchoredTspans(textEl: SVGTextElement): boolean {
+  return [...textEl.querySelectorAll('tspan')].some(
+    (tspan) => tspan.getAttribute('text-anchor') === 'end',
+  )
+}
+
+/** svg2pdf 对 text-anchor=end 支持不稳：用 live 阶段实测宽度换算为左锚 x */
+function finalizeArabicEndAnchoredTspansForPdf(textEl: SVGTextElement, content: string): void {
+  for (const tspan of [...textEl.querySelectorAll('tspan')]) {
+    if (tspan.getAttribute('text-anchor') !== 'end') continue
+
+    const raw = tspan.textContent ?? ''
+    const fontSize = parseFontSize(
+      tspan.getAttribute('font-size') || textEl.getAttribute('font-size'),
+    )
+    const stored = parseFloat(tspan.getAttribute('data-ex-run-width') ?? '')
+    let width = Number.isFinite(stored) && stored > 0 ? stored : 0
+    if (width <= 0) {
+      const current = (tspan.getAttribute('font-family') ?? '')
+        .replace(/['"]/g, '')
+        .split(',')[0]
+        .trim()
+      const role = resolveRoleForExport(raw, pickFontRole(current, raw || content))
+      width = estimateRunWidth(
+        role === 'zh' ? toFzPercentGlyph(raw) : raw,
+        role,
+        fontSize,
+      )
+    }
+
+    const endX = parseFloat(tspan.getAttribute('x') || '0')
+    if (Number.isFinite(endX) && width > 0) {
+      tspan.setAttribute('x', String(Math.max(0, endX - width)))
+    }
+    tspan.removeAttribute('text-anchor')
+    tspan.removeAttribute('data-ex-run-width')
+  }
+}
+
+function prepareArabicLiveTextForPdf(textEl: SVGTextElement, content: string): void {
+  for (const el of [textEl, ...textEl.querySelectorAll('tspan')]) {
+    normalizeElementFontFamily(el)
+  }
+
+  for (const tspan of textEl.querySelectorAll('tspan')) {
+    const tspanText = tspan.textContent ?? ''
+    const current = tspan.getAttribute('font-family') ?? ''
+    const currentToken = current.replace(/['"]/g, '').split(',')[0].trim()
+    const role = resolveRoleForExport(
+      tspanText,
+      pickFontRole(currentToken, tspanText || content),
+    )
+    tspan.setAttribute('font-family', svgFontFamilyForRole(role))
+    finalizeZhTspanGlyph(tspan, role, tspanText)
+  }
+
+  textEl.removeAttribute('font-family')
+  finalizeArabicEndAnchoredTspansForPdf(textEl, content)
+}
+
 export function prepareSvgForEditablePdf(svg: SVGSVGElement): void {
   svg.querySelectorAll('style').forEach((styleEl) => styleEl.remove())
 
@@ -265,9 +328,16 @@ export function prepareSvgForEditablePdf(svg: SVGSVGElement): void {
     textEl.removeAttribute('unicode-bidi')
 
     const content = textEl.textContent ?? ''
+    if (hasArabicEndAnchoredTspans(textEl)) {
+      prepareArabicLiveTextForPdf(textEl, content)
+      continue
+    }
+
     const fallbackRole: FontRole = isArabicExportText(content)
       ? 'arabic'
       : pickFontRole(textEl.getAttribute('font-family') || '', content)
+
+    const elementFontFamily = textEl.getAttribute('font-family') || ''
 
     splitPlainMixedTextElement(textEl)
     if (!isCareAdviceLiveNode(textEl)) {
@@ -280,7 +350,7 @@ export function prepareSvgForEditablePdf(svg: SVGSVGElement): void {
     const tspans = [...textEl.querySelectorAll('tspan')]
     if (tspans.length === 0) {
       const role = resolveRoleForExport(content, fallbackRole)
-      textEl.setAttribute('font-family', svgFontFamilyForRole(role))
+      textEl.setAttribute('font-family', svgFontFamilyForRole(role, elementFontFamily))
       if (role === 'zh') {
         textEl.textContent = toFzPercentGlyph(content)
       }
@@ -297,7 +367,7 @@ export function prepareSvgForEditablePdf(svg: SVGSVGElement): void {
         tspanText,
         pickFontRole(currentToken, tspanText || content),
       )
-      tspan.setAttribute('font-family', svgFontFamilyForRole(role))
+      tspan.setAttribute('font-family', svgFontFamilyForRole(role, elementFontFamily))
       finalizeZhTspanGlyph(tspan, role, tspanText)
     }
   }

@@ -1,4 +1,5 @@
 import type { CareSymbolKey, LabelData } from '../../types'
+import { normalizeCareSymbolSvg } from '../../utils/normalizeCareSymbolSvg'
 import doNotBleachSvg from './do-not-bleach.svg?raw'
 import doNotDryCleanSvg from './do-not-dry-clean.svg?raw'
 import doNotCleanLabelSvg from './do-not-clean.svg?raw'
@@ -7,6 +8,7 @@ import dripFlatDryingSvg from './drip-flat-drying.svg?raw'
 import handWashSvg from './hand-wash.svg?raw'
 import ironLowTempSvg from './iron-low-temp.svg?raw'
 import lineDryShadeSvg from './line-dry-shade.svg?raw'
+import lineDryingInShadeSvg from './line-drying-in-the-shade.svg?raw'
 import washingInstructionsLabelSvg from './washing-instructions.svg?raw'
 
 export interface CareSymbolAutoMatch {
@@ -31,18 +33,18 @@ export interface CareSymbolAsset {
 }
 
 export const CARE_SYMBOL_DEFINITIONS: CareSymbolDefinition[] = [
-  { key: 'handWash', name: 'hand-wash', label: '手洗', svg: handWashSvg },
-  { key: 'doNotBleach', name: 'do-not-bleach', label: '不可漂白', svg: doNotBleachSvg },
-  { key: 'lineDryShade', name: 'line-dry-shade', label: '阴凉处平摊晾干', svg: lineDryShadeSvg },
-  { key: 'dripFlatDrying', name: 'drip-flat-drying', label: '平摊晾干', svg: dripFlatDryingSvg },
-  { key: 'ironLowTemp', name: 'iron-low-temp', label: '低温熨烫', svg: ironLowTempSvg },
-  { key: 'doNotIron', name: 'do-not-iron', label: '不可熨烫', svg: doNotIronSvg },
+  { key: 'handWash', name: 'hand-wash', label: '手洗', svg: normalizeCareSymbolSvg(handWashSvg) },
+  { key: 'doNotBleach', name: 'do-not-bleach', label: '不可漂白', svg: normalizeCareSymbolSvg(doNotBleachSvg) },
+  { key: 'lineDryShade', name: 'line-dry-shade', label: '阴凉处平摊晾干', svg: normalizeCareSymbolSvg(lineDryShadeSvg) },
+  { key: 'lineDryingInShade', name: 'line-drying-in-the-shade', label: '阴凉处悬挂晾干', svg: normalizeCareSymbolSvg(lineDryingInShadeSvg) },
+  { key: 'dripFlatDrying', name: 'drip-flat-drying', label: '平摊晾干', svg: normalizeCareSymbolSvg(dripFlatDryingSvg) },
+  { key: 'ironLowTemp', name: 'iron-low-temp', label: '低温熨烫', svg: normalizeCareSymbolSvg(ironLowTempSvg) },
+  { key: 'doNotIron', name: 'do-not-iron', label: '不可熨烫', svg: normalizeCareSymbolSvg(doNotIronSvg) },
   {
     key: 'doNotDryClean',
     name: 'do-not-dry-clean',
     label: '不可干洗',
-    svg: doNotDryCleanSvg,
-    autoMatch: { field: 'dryCleanNote', includes: '不可干洗' },
+    svg: normalizeCareSymbolSvg(doNotDryCleanSvg),
   },
 ]
 

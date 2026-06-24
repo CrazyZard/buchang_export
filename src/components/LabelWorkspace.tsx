@@ -1,6 +1,7 @@
 import { useCallback, useState, type CSSProperties } from 'react'
 import { BatchExcelImport } from './BatchExcelImport'
 import { BrandLogo } from './BrandLogo'
+import { useSelectedLogo } from '../context/SelectedLogoContext'
 import { CareSymbolPicker } from './CareSymbols'
 import { CompositionPasteInput } from './CompositionPasteInput'
 import { DownJacketEditor } from './DownJacketEditor'
@@ -12,7 +13,7 @@ import { resolveCompositionParts } from '../templates'
 import { useTemplate } from '../context/TemplateContext'
 import type { BatchLabelItem, CompositionPart, Dictionary, LabelData } from '../types'
 import { FIXED_LABELS } from '../types'
-import { formatLabelSizeMm, LABEL_WIDTH_MM, type PreviewLabelHeights } from '../utils/labelMeasure'
+import { formatLabelSizeMm, type PreviewLabelHeights } from '../utils/labelMeasure'
 
 interface LabelWorkspaceProps {
   labelData: LabelData
@@ -27,6 +28,7 @@ interface LabelWorkspaceProps {
     items: LabelData['composition'][CompositionPart],
   ) => void
   onApplyCompositionPaste: (text: string) => void
+  onCompositionClear: () => void
   onBatchImport: (items: BatchLabelItem[]) => void
   onBatchClear: () => void
 }
@@ -41,10 +43,14 @@ export function LabelWorkspace({
   onUpdateField,
   onUpdateComposition,
   onApplyCompositionPaste,
+  onCompositionClear,
   onBatchImport,
   onBatchClear,
 }: LabelWorkspaceProps) {
   const template = useTemplate()
+  const isSenma = template.id === 'senma-regular' || template.id === 'senma-down'
+  const isFrogDown = template.id === 'frog-down'
+  const { logoSvg: selectedLogo, setLogoSvg } = useSelectedLogo()
   const compositionParts = resolveCompositionParts(template)
   const [previewHeights, setPreviewHeights] = useState<PreviewLabelHeights | null>(null)
   const handlePreviewHeightsChange = useCallback((heights: PreviewLabelHeights) => {
@@ -62,13 +68,15 @@ export function LabelWorkspace({
   }, [])
   const editorLabelStyle = {
     '--label-head-seam': `${template.layout.headSeamMm}mm`,
+    '--label-width': `${template.layout.labelWidthMm ?? 25}mm`,
   } as CSSProperties
+  const labelWidthMm = template.layout.labelWidthMm ?? 25
   const batchMode = batchItems.length > 0
   const previewSizeHint = batchMode
     ? `共 ${batchItems.length} 条`
     : previewHeights
-      ? formatLabelSizeMm(LABEL_WIDTH_MM, previewHeights.pairedMm)
-      : `${LABEL_WIDTH_MM}×…mm`
+      ? formatLabelSizeMm(labelWidthMm, previewHeights.pairedMm)
+      : `${labelWidthMm}×…mm`
 
   return (
     <main className="label-workspace">
@@ -91,6 +99,7 @@ export function LabelWorkspace({
             <BatchExcelImport
               baseLabelData={template.createDefaultLabelData()}
               batchCount={batchItems.length}
+              templateId={template.id}
               onImport={onBatchImport}
               onClear={onBatchClear}
             />
@@ -98,6 +107,22 @@ export function LabelWorkspace({
           {template.layout.showBrandLogo ? (
             <section className="edit-section">
               <div className="edit-section-label">品牌 Logo</div>
+              {template.logoOptions && template.logoOptions.length > 1 ? (
+                <select
+                  className="logo-selector"
+                  value={selectedLogo ?? template.logoSvg}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setLogoSvg(v === template.logoSvg ? null : v)
+                  }}
+                >
+                  {template.logoOptions.map((opt) => (
+                    <option key={opt.svg} value={opt.svg}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
               <div className={`brand-logo-preview wash-label--${template.id}`} style={editorLabelStyle}>
                 <div className="label-head-seam" aria-hidden="true" />
                 <div className="label-fold-line" />
@@ -109,13 +134,16 @@ export function LabelWorkspace({
           <section className="edit-section">
             <div className="edit-section-label">{FIXED_LABELS.composition}</div>
             {template.compositionMode === 'down-jacket' && labelData.downJacket ? (
-              <DownJacketEditor
-                value={labelData.downJacket}
-                onChange={(downJacket) => onUpdateField('downJacket', downJacket)}
-              />
+              <>
+                {isSenma || isFrogDown ? <CompositionPasteInput onApply={onApplyCompositionPaste} onClear={onCompositionClear} /> : null}
+                <DownJacketEditor
+                  value={labelData.downJacket}
+                  onChange={(downJacket) => onUpdateField('downJacket', downJacket)}
+                />
+              </>
             ) : (
               <>
-                <CompositionPasteInput onApply={onApplyCompositionPaste} />
+                <CompositionPasteInput onApply={onApplyCompositionPaste} onClear={onCompositionClear} />
                 <MaterialEditor
                   parts={compositionParts}
                   optionalParts={template.optionalCompositionParts}
@@ -141,16 +169,18 @@ export function LabelWorkspace({
                 onChange={(symbols) => onUpdateField('careSymbols', symbols)}
               />
             </div>
+            {!isSenma ? (
+              <label className="field">
+                <span>干洗说明</span>
+                <input
+                  type="text"
+                  value={labelData.dryCleanNote}
+                  onChange={(e) => onUpdateField('dryCleanNote', e.target.value)}
+                />
+              </label>
+            ) : null}
             <label className="field">
-              <span>干洗说明</span>
-              <input
-                type="text"
-                value={labelData.dryCleanNote}
-                onChange={(e) => onUpdateField('dryCleanNote', e.target.value)}
-              />
-            </label>
-            <label className="field">
-              <span>洗涤建议</span>
+              <span>{isSenma ? '温馨提示' : isFrogDown ? '洗涤维护方式' : '洗涤建议'}</span>
               <textarea
                 rows={3}
                 value={labelData.careAdvice}

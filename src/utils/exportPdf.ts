@@ -2,7 +2,6 @@ import { elementToSVG, inlineResources } from 'dom-to-svg'
 import { jsPDF } from 'jspdf'
 import 'svg2pdf.js'
 import {
-  convertSvgTextToPaths,
   preloadExportFonts,
   removeRasterImages,
   resetExportFontCache,
@@ -15,18 +14,18 @@ import { flattenCompositionBlocksForLive } from './flattenCompositionBlocksForLi
 import { flattenInlineTextSpans } from './flattenExportTextSpans'
 import { mergeLiveSingleTextBlocks } from './mergeLiveSingleTextBlocks'
 import { normalizeSvgRootForPdf } from './normalizeSvgForPdf'
-import { sanitizeSvgForSvg2pdf } from './sanitizeSvgForSvg2pdf'
 
-const LABEL_WIDTH_MM = 25
+const LABEL_WIDTH_MM_DEFAULT = 25
 const PAGE_MARGIN_MM = 2
 const LABEL_GAP_MM = 3
 const MIN_LABEL_HEIGHT_MM = 10
 
-export type ExportPdfTextMode = 'outline' | 'live'
-
-export interface ExportPdfOptions {
-  /** outline=转曲（印刷）；live=保留文字（Illustrator 可编辑） */
-  textMode?: ExportPdfTextMode
+/** 从 label 元素读取 CSS 变量 --label-width，没有则回退到默认 25mm */
+function getLabelWidthMm(label: HTMLElement): number {
+  const raw = getComputedStyle(label).getPropertyValue('--label-width').trim()
+  const val = parseFloat(raw)
+  if (val > 0) return val
+  return LABEL_WIDTH_MM_DEFAULT
 }
 
 function waitForLayout(): Promise<void> {
@@ -141,23 +140,33 @@ function syncPairMinHeight(source: HTMLElement, translated: HTMLElement): void {
   translated.style.minHeight = height
 }
 
-/** 按 25mm 宽与 DOM 实际高宽比换算洗唛高度（比 SVG viewBox 更稳） */
+/** 按 CSS --label-width 与 DOM 实际高宽比换算洗唛高度（比 SVG viewBox 更稳） */
 function measureLabelHeightMm(element: HTMLElement): number {
   const widthPx = element.offsetWidth || element.getBoundingClientRect().width
   const heightPx = element.offsetHeight || element.getBoundingClientRect().height
   if (widthPx <= 0 || heightPx <= 0) {
     throw new Error('洗唛尺寸为 0，请刷新页面后重试')
   }
-  return LABEL_WIDTH_MM * (heightPx / widthPx)
+  return getLabelWidthMm(element) * (heightPx / widthPx)
+}
+
+function isRtlCaptureText(textEl: SVGTextElement): boolean {
+  const dir = (textEl.getAttribute('direction') || '').toLowerCase()
+  if (dir === 'rtl') return true
+  return Boolean(textEl.closest('g[dir="rtl"], [dir="rtl"], g.rtl, .rtl'))
 }
 
 /**
  * 删 textLength 前，先把 dom-to-svg 测得的几何（左缘/右缘）存到 text 上。
  * 右缘 = tspan.x + textLength —— 阿语 RTL 转曲要靠它右对齐（否则 text 无 x，右锚算成 0 → 全挤到左缘叠一起）。
+ * RTL 且 textLength=0 时：x 为右锚，左缘记 0（dom-to-svg 量不到阿语宽度）。
  */
 function captureExportGeometry(svg: SVGSVGElement): void {
-  for (const textEl of svg.querySelectorAll('text')) {
-    const tspans = [...textEl.querySelectorAll('tspan')]
+  const textEls = svg.querySelectorAll('text') as NodeListOf<SVGTextElement>
+  for (let i = 0; i < textEls.length; i++) {
+    const textEl = textEls[i]
+    const tspans = Array.from<SVGTSpanElement>(textEl.querySelectorAll('tspan'))
+    const rtl = isRtlCaptureText(textEl)
 
     const xs: number[] = []
     let right = -Infinity
@@ -168,14 +177,28 @@ function captureExportGeometry(svg: SVGSVGElement): void {
         if (!Number.isFinite(x)) continue
         xs.push(x)
         const tl = parseFloat(tspan.getAttribute('textLength') ?? '')
-        right = Math.max(right, Number.isFinite(tl) ? x + tl : x)
+        if (Number.isFinite(tl) && tl > 0) {
+          right = Math.max(right, x + tl)
+        } else if (rtl) {
+          right = Math.max(right, x)
+          xs.push(0)
+        } else {
+          right = Math.max(right, x)
+        }
       }
     } else {
       const x = parseFloat(textEl.getAttribute('x') ?? '')
       if (Number.isFinite(x)) {
         xs.push(x)
         const tl = parseFloat(textEl.getAttribute('textLength') ?? '')
-        right = Number.isFinite(tl) ? x + tl : x
+        if (Number.isFinite(tl) && tl > 0) {
+          right = Number.isFinite(tl) ? x + tl : x
+        } else if (rtl) {
+          right = x
+          xs.push(0)
+        } else {
+          right = x
+        }
       }
     }
 
@@ -202,8 +225,8 @@ function logSvgTextStructure(svg: SVGSVGElement, label: string): void {
   if (typeof window === 'undefined') return
   if (!(window as unknown as { __EXPORT_DEBUG__?: boolean }).__EXPORT_DEBUG__) return
 
-  const rows = [...svg.querySelectorAll('text')].map((textEl, index) => {
-    const tspans = [...textEl.querySelectorAll('tspan')].map((tspan) => ({
+  const rows = Array.from(svg.querySelectorAll('text')).map((textEl, index) => {
+    const tspans = Array.from(textEl.querySelectorAll('tspan')).map((tspan) => ({
       x: tspan.getAttribute('x'),
       y: tspan.getAttribute('y'),
       textLength: tspan.getAttribute('textLength'),
@@ -239,7 +262,7 @@ function logFinalPaths(svg: SVGSVGElement, label: string): void {
   if (typeof window === 'undefined') return
   if (!(window as unknown as { __EXPORT_DEBUG__?: boolean }).__EXPORT_DEBUG__) return
 
-  const rows = [...svg.querySelectorAll('path')].map((p, index) => {
+  const rows = Array.from(svg.querySelectorAll('path')).map((p, index) => {
     const d = p.getAttribute('d') ?? ''
     const glyphCount = (d.match(/M/gi) ?? []).length // M 命令数≈子路径数
     const nums = d.match(/-?\d+\.?\d*/g)?.map(Number) ?? []
@@ -279,13 +302,9 @@ function logFinalPaths(svg: SVGSVGElement, label: string): void {
   console.log(`[FINAL_PATHS] ${label} pathCount=${rows.length}\n` + JSON.stringify(rows, null, 1))
 }
 
-/** DOM → SVG；outline 转曲 / live 保留可编辑文字 */
-async function elementToSvgRoot(
-  element: HTMLElement,
-  textMode: ExportPdfTextMode,
-): Promise<SVGSVGElement> {
-  const restoreLiveBlocks =
-    textMode === 'live' ? flattenCompositionBlocksForLive(element) : () => {}
+/** DOM → SVG：保留可编辑文字 */
+async function elementToSvgRoot(element: HTMLElement): Promise<SVGSVGElement> {
+  const restoreLiveBlocks = flattenCompositionBlocksForLive(element)
   const restoreFlatten = flattenInlineTextSpans(element)
 
   try {
@@ -313,23 +332,14 @@ async function elementToSvgRoot(
 
     try {
       resetExportFontCache()
-      if (textMode === 'live') {
-        mergeLiveSingleTextBlocks(svgRoot)
-        await convertSvgTextToLiveText(svgRoot)
-        prepareSvgForEditablePdf(svgRoot)
-      } else {
-        await convertSvgTextToPaths(svgRoot)
-      }
+      mergeLiveSingleTextBlocks(svgRoot)
+      await convertSvgTextToLiveText(svgRoot)
+      prepareSvgForEditablePdf(svgRoot)
     } catch (error) {
-      console.warn(textMode === 'live' ? '可编辑文字导出失败' : '文字转曲失败', error)
-      if (textMode === 'live') {
-        throw error instanceof Error ? error : new Error('可编辑文字导出失败')
-      }
+      console.warn('可编辑文字导出失败', error)
+      throw error instanceof Error ? error : new Error('可编辑文字导出失败')
     }
 
-    if (textMode === 'outline') {
-      sanitizeSvgForSvg2pdf(svgRoot)
-    }
     normalizeSvgRootForPdf(svgRoot)
 
     logFinalPaths(svgRoot, element.className)
@@ -346,56 +356,53 @@ interface SvgLabelPair {
   translatedSvg: SVGSVGElement
   sourceHeightMm: number
   translatedHeightMm: number
+  labelWidthMm: number
 }
 
 async function buildSvgLabelPair(
   source: HTMLElement,
   translated: HTMLElement,
-  textMode: ExportPdfTextMode,
 ): Promise<SvgLabelPair> {
   const sourceHeightMm = measureLabelHeightMm(source)
   const translatedHeightMm = measureLabelHeightMm(translated)
+  const labelWidthMm = getLabelWidthMm(source)
 
-  const sourceSvg = await elementToSvgRoot(source, textMode)
-  const translatedSvg = await elementToSvgRoot(translated, textMode)
+  const sourceSvg = await elementToSvgRoot(source)
+  const translatedSvg = await elementToSvgRoot(translated)
 
   return {
     sourceSvg,
     translatedSvg,
     sourceHeightMm,
     translatedHeightMm,
+    labelWidthMm,
   }
 }
 
 async function renderSvgLabelPair(
   pdf: jsPDF,
   pair: SvgLabelPair,
-  textMode: ExportPdfTextMode,
 ): Promise<void> {
   const heightMm = Math.max(pair.sourceHeightMm, pair.translatedHeightMm)
-  const restoreLiveText = textMode === 'live' ? patchPdfLiveTextPipeline(pdf) : () => {}
+  const w = pair.labelWidthMm
 
-  try {
     await pdf.svg(pair.sourceSvg, {
       x: PAGE_MARGIN_MM,
       y: PAGE_MARGIN_MM,
-      width: LABEL_WIDTH_MM,
+      width: w,
       height: heightMm,
     })
 
     await pdf.svg(pair.translatedSvg, {
-      x: PAGE_MARGIN_MM + LABEL_WIDTH_MM + LABEL_GAP_MM,
+      x: PAGE_MARGIN_MM + w + LABEL_GAP_MM,
       y: PAGE_MARGIN_MM,
-      width: LABEL_WIDTH_MM,
+      width: w,
       height: heightMm,
     })
-  } finally {
-    restoreLiveText()
-  }
 }
 
-function pageWidthMm(): number {
-  return PAGE_MARGIN_MM * 2 + LABEL_WIDTH_MM * 2 + LABEL_GAP_MM
+function pageWidthMm(labelWidthMm: number): number {
+  return PAGE_MARGIN_MM * 2 + labelWidthMm * 2 + LABEL_GAP_MM
 }
 
 function createPdfPage(widthMm: number, heightMm: number): jsPDF {
@@ -431,9 +438,7 @@ export async function exportLabelsPdf(
   sourceContainer: HTMLElement,
   translatedContainer: HTMLElement,
   filename = '洗唛.pdf',
-  options: ExportPdfOptions = {},
 ): Promise<void> {
-  const textMode = options.textMode ?? 'outline'
   const restoreCaptureEnvironment = prepareCaptureEnvironment([
     sourceContainer,
     translatedContainer,
@@ -457,6 +462,8 @@ export async function exportLabelsPdf(
     const sourceLabels = queryWashLabels(sourceContainer)
     const translatedLabels = queryWashLabels(translatedContainer)
 
+    console.log(`[批量导出] sourceLabels=${sourceLabels.length}, translatedLabels=${translatedLabels.length}`)
+
     if (sourceLabels.length === 0) {
       throw new Error('没有可导出的洗唛')
     }
@@ -466,14 +473,17 @@ export async function exportLabelsPdf(
 
     await prepareExportContainers(sourceContainer, translatedContainer)
 
-    const widthMm = pageWidthMm()
+    const labelWidthMm = getLabelWidthMm(sourceLabels[0])
+    const widthMm = pageWidthMm(labelWidthMm)
     let pdf: jsPDF | null = null
+
+    let restoreLiveText: () => void = () => {}
 
     for (let i = 0; i < sourceLabels.length; i++) {
       syncPairMinHeight(sourceLabels[i], translatedLabels[i])
       await waitForLayout()
 
-      const pair = await buildSvgLabelPair(sourceLabels[i], translatedLabels[i], textMode)
+      const pair = await buildSvgLabelPair(sourceLabels[i], translatedLabels[i])
       const contentHeightMm = Math.max(
         pair.sourceHeightMm,
         pair.translatedHeightMm,
@@ -483,25 +493,27 @@ export async function exportLabelsPdf(
 
       if (!pdf) {
         pdf = createPdfPage(widthMm, pageHeightMm)
-        if (textMode === 'live') {
-          await embedWashLabelPdfFonts(pdf)
-        }
+        await embedWashLabelPdfFonts(pdf)
+        restoreLiveText = patchPdfLiveTextPipeline(pdf)
+        console.log(`[批量导出] 第1条: 创建PDF页 sourceH=${pair.sourceHeightMm.toFixed(1)} translatedH=${pair.translatedHeightMm.toFixed(1)} pageH=${pageHeightMm.toFixed(1)}`)
       } else {
         pdf.addPage([widthMm, pageHeightMm], widthMm > pageHeightMm ? 'l' : 'p')
+        console.log(`[批量导出] 第${i + 1}条: addPage sourceH=${pair.sourceHeightMm.toFixed(1)} translatedH=${pair.translatedHeightMm.toFixed(1)} pageH=${pageHeightMm.toFixed(1)} pdfPageCount=${pdf.getNumberOfPages()}`)
       }
 
-      await renderSvgLabelPair(pdf, pair, textMode)
+      // 显式 setPage 确保 pdf.svg() 落在正确页面（jsPDF svg 插件在多页场景下可能丢失当前页上下文）
+      pdf.setPage(pdf.getNumberOfPages())
+      await renderSvgLabelPair(pdf, pair)
     }
 
+    console.log(`[批量导出] 循环结束, PDF总页数=${pdf!.getNumberOfPages()}`)
+    restoreLiveText()
     pdf!.save(filename)
   } finally {
     restoreCaptureEnvironment()
   }
 }
 
-export function resolvePdfFilename(batchCount: number, textMode: ExportPdfTextMode = 'outline'): string {
-  if (textMode === 'live') {
-    return batchCount > 1 ? '洗唛批量-可编辑.pdf' : '洗唛-可编辑.pdf'
-  }
+export function resolvePdfFilename(batchCount: number): string {
   return batchCount > 1 ? '洗唛批量.pdf' : '洗唛.pdf'
 }
